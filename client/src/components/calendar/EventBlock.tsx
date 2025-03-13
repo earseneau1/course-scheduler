@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { type ScheduleEvent } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { minutesToPx, pxToMinutes, snapTime } from "@/lib/time";
+import { minutesToPx, pxToMinutes, snapTime, formatTime } from "@/lib/time";
 import { AssignProfessorDialog } from "@/components/dialogs/AssignProfessorDialog";
 import { AssignClassDialog } from "@/components/dialogs/AssignClassDialog";
 import { Trash2, GripVertical, UserPlus, BookOpen } from "lucide-react";
@@ -129,12 +129,15 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
             </Button>
           </div>
 
-          {/* Middle section with drag handle */}
+          {/* Middle section with drag handle and time */}
           <div 
-            className="flex items-center justify-center py-1"
+            className="flex flex-col items-center justify-center py-1"
             onMouseDown={(e) => handleMouseDown(e, "move")}
           >
             <GripVertical className="h-4 w-4 text-gray-400" />
+            <div className="text-xs text-center mt-1">
+              {formatTime(event.startTime)} - {formatTime(event.startTime + event.duration)}
+            </div>
           </div>
 
           {/* Bottom row with delete button */}
