@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertEventSchema, insertProfessorSchema, insertClassSchema } from "@shared/schema";
+import { insertEventSchema, insertProfessorSchema, insertClassSchema, insertRoomSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -33,6 +33,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     const class_ = await storage.createClass(result.data);
     res.json(class_);
+  });
+
+  // Rooms routes
+  app.get("/api/rooms", async (_req, res) => {
+    const rooms = await storage.getRooms();
+    res.json(rooms);
+  });
+
+  app.post("/api/rooms", async (req, res) => {
+    const result = insertRoomSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    const room = await storage.createRoom(result.data);
+    res.json(room);
   });
 
   // Schedule events routes

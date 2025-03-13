@@ -3,12 +3,14 @@ import {
   Class, InsertClass,
   ScheduleEvent, InsertEvent,
   User, InsertUser,
+  Room, InsertRoom,
   Day,
   professors,
   classes,
   scheduleEvents,
   users,
-  terms
+  terms,
+  rooms
 } from "@shared/schema";
 import session from "express-session";
 import { db } from "./db";
@@ -33,6 +35,10 @@ export interface IStorage {
   updateEvent(id: number, event: Partial<InsertEvent>): Promise<ScheduleEvent>;
   deleteEvent(id: number): Promise<void>;
   getEventsByDay(day: Day): Promise<ScheduleEvent[]>;
+
+  // Room operations
+  getRooms(): Promise<Room[]>;
+  createRoom(room: InsertRoom): Promise<Room>;
 
   // User operations
   getUser(id: number): Promise<User>;
@@ -69,6 +75,15 @@ export class DatabaseStorage implements IStorage {
   async createClass(class_: InsertClass): Promise<Class> {
     const [newClass] = await db.insert(classes).values(class_).returning();
     return newClass;
+  }
+
+  async getRooms(): Promise<Room[]> {
+    return await db.select().from(rooms);
+  }
+
+  async createRoom(room: InsertRoom): Promise<Room> {
+    const [newRoom] = await db.insert(rooms).values(room).returning();
+    return newRoom;
   }
 
   async getEvents(): Promise<ScheduleEvent[]> {
