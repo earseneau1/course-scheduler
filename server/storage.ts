@@ -3,22 +3,20 @@ import {
   Class, InsertClass,
   ScheduleEvent, InsertEvent,
   User, InsertUser,
-  Day
+  Day,
+  professors,
+  classes,
+  scheduleEvents,
+  users,
+  terms
 } from "@shared/schema";
 import session from "express-session";
-import createMemoryStore from "memorystore";
-import { scrypt, randomBytes } from "crypto";
-import { promisify } from "util";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
 
-const MemoryStore = createMemoryStore(session);
-const scryptAsync = promisify(scrypt);
-
-// Helper function to hash the initial admin password
-async function hashInitialPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
-}
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   // Professor operations
@@ -45,136 +43,101 @@ export interface IStorage {
   sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private professors: Map<number, Professor>;
-  private classes: Map<number, Class>;
-  private events: Map<number, ScheduleEvent>;
-  private users: Map<number, User>;
-  private currentIds: { [key: string]: number };
+export class DatabaseStorage implements IStorage {
   public sessionStore: session.Store;
 
   constructor() {
-    this.professors = new Map();
-    this.classes = new Map();
-    this.events = new Map();
-    this.users = new Map();
-    this.currentIds = { professor: 1, class: 1, event: 1, user: 1 };
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true,
     });
-
-    // Initialize the storage with sample data
-    this.initializeData();
-  }
-
-  private async initializeData() {
-    // Add initial admin user with hashed password
-    const hashedPassword = await hashInitialPassword("admin");
-    this.createUser({
-      username: "admin",
-      password: hashedPassword,
-      role: "admin"
-    });
-
-    // Add some initial data
-    const sampleProfessors = [
-      { name: "Dr. Smith" },
-      { name: "Prof. Johnson" },
-      { name: "Dr. Williams" },
-      { name: "Prof. Brown" }
-    ];
-
-    const sampleClasses = [
-      { name: "Mathematics 101", code: "MATH101", termId: null },
-      { name: "History 202", code: "HIST202", termId: null },
-      { name: "Biology 303", code: "BIO303", termId: null },
-      { name: "Chemistry 404", code: "CHEM404", termId: null }
-    ];
-
-    sampleProfessors.forEach(p => this.createProfessor(p));
-    sampleClasses.forEach(c => this.createClass(c));
   }
 
   async getProfessors(): Promise<Professor[]> {
-    return Array.from(this.professors.values());
+    return await db.select().from(professors);
   }
 
   async createProfessor(professor: InsertProfessor): Promise<Professor> {
-    const id = this.currentIds.professor++;
-    const newProf = { ...professor, id };
-    this.professors.set(id, newProf);
+    const [newProf] = await db.insert(professors).values(professor).returning();
     return newProf;
   }
 
   async getClasses(): Promise<Class[]> {
-    return Array.from(this.classes.values());
+    return await db.select().from(classes);
   }
 
   async createClass(class_: InsertClass): Promise<Class> {
-    const id = this.currentIds.class++;
-    const newClass = { ...class_, id, termId: class_.termId ?? null };
-    this.classes.set(id, newClass);
+    const [newClass] = await db.insert(classes).values(class_).returning();
     return newClass;
   }
 
   async getEvents(): Promise<ScheduleEvent[]> {
-    return Array.from(this.events.values());
+    return await db.select().from(scheduleEvents);
   }
 
   async createEvent(event: InsertEvent): Promise<ScheduleEvent> {
-    const id = this.currentIds.event++;
-    const newEvent = {
-      ...event,
-      id,
-      termId: event.termId ?? null,
-      professorId: event.professorId ?? null,
-      classId: event.classId ?? null,
-      roomId: event.roomId ?? null,
-      repeatPattern: event.repeatPattern ?? null,
-      repeatGroupId: event.repeatGroupId ?? null
-    };
-    this.events.set(id, newEvent);
+    const [newEvent] = await db.insert(scheduleEvents).values(event).returning();
     return newEvent;
   }
 
   async updateEvent(id: number, event: Partial<InsertEvent>): Promise<ScheduleEvent> {
-    const existingEvent = this.events.get(id);
-    if (!existingEvent) throw new Error(`Event with id ${id} not found`);
+    const [updatedEvent] = await db
+      .update(scheduleEvents)
+      .set(event)
+      .where(eq(scheduleEvents.id, id))
+      .returning();
 
-    const updatedEvent = { ...existingEvent, ...event };
-    this.events.set(id, updatedEvent);
+    if (!updatedEvent) {
+      throw new Error(`Event with id ${id} not found`);
+    }
+
     return updatedEvent;
   }
 
   async deleteEvent(id: number): Promise<void> {
-    this.events.delete(id);
+    const result = await db
+      .delete(scheduleEvents)
+      .where(eq(scheduleEvents.id, id))
+      .returning();
+
+    if (!result.length) {
+      throw new Error(`Event with id ${id} not found`);
+    }
   }
 
   async getEventsByDay(day: Day): Promise<ScheduleEvent[]> {
-    return Array.from(this.events.values()).filter(event => event.day === day);
+    return await db
+      .select()
+      .from(scheduleEvents)
+      .where(eq(scheduleEvents.day, day));
   }
 
   async getUser(id: number): Promise<User> {
-    const user = this.users.get(id);
-    if (!user) throw new Error(`User with id ${id} not found`);
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id));
+
+    if (!user) {
+      throw new Error(`User with id ${id} not found`);
+    }
+
     return user;
   }
 
   async getUserByUsername(username: string): Promise<User | null> {
-    return Array.from(this.users.values()).find(u => u.username === username) || null;
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username));
+
+    return user || null;
   }
 
   async createUser(user: Omit<InsertUser, "confirmPassword">): Promise<User> {
-    const id = this.currentIds.user++;
-    const newUser: User = {
-      ...user,
-      id,
-      role: user.role ?? "faculty",
-      createdAt: new Date()
-    };
-    this.users.set(id, newUser);
+    const [newUser] = await db.insert(users).values(user).returning();
     return newUser;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
