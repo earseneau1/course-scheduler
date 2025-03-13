@@ -369,10 +369,11 @@ export default function AdminPage() {
       const formData = new FormData(e.target as HTMLFormElement);
       const name = formData.get("name") as string;
       const code = formData.get("code") as string;
+      const termId = parseInt(formData.get("termId") as string) || null;
 
       updateClassMutation.mutate({
         id: editingClass.id,
-        data: { name, code },
+        data: { name, code, termId },
       });
     };
 
@@ -394,6 +395,12 @@ export default function AdminPage() {
               placeholder="Class Code"
               defaultValue={editingClass?.code}
               required
+            />
+            <Input
+              name="termId"
+              type="number"
+              placeholder="Term ID (optional)"
+              defaultValue={editingClass?.termId || ""}
             />
             <Button type="submit">Update Class</Button>
           </form>
