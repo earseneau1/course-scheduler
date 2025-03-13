@@ -11,12 +11,13 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Academic terms
+// Academic terms (builds)
 export const terms = pgTable("terms", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
+  status: text("status", { enum: ["draft", "published", "archived"] }).notNull().default("draft"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
