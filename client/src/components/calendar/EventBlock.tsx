@@ -44,6 +44,8 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
       e.preventDefault();
       e.stopPropagation();
 
+      if (!isDragging && !isResizing) return;
+
       const deltaY = e.clientY - startY.current;
       const deltaMins = pxToMinutes(deltaY);
 
@@ -80,6 +82,10 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
 
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
+  };
+
+  const handleDurationPreset = (duration: number) => {
+    onUpdate({ id: event.id, duration });
   };
 
   return (
@@ -146,20 +152,62 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
             </div>
           </div>
 
-          {/* Bottom row with delete button */}
+          {/* Bottom section with duration presets and delete */}
           {!event.repeatPattern && (
-            <div className="flex justify-center mt-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-destructive hover:text-destructive/90"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(event.id);
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            <div className="mt-1">
+              {/* Duration presets */}
+              <div className="flex justify-end gap-1 mb-1">
+                {event.day !== "Tuesday" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDurationPreset(50);
+                    }}
+                  >
+                    50
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDurationPreset(80);
+                  }}
+                >
+                  80
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDurationPreset(160);
+                  }}
+                >
+                  160
+                </Button>
+              </div>
+
+              {/* Delete button */}
+              <div className="flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-destructive hover:text-destructive/90"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(event.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
         </div>
