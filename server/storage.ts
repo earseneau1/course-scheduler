@@ -24,10 +24,20 @@ export interface IStorage {
   // Professor operations
   getProfessors(): Promise<Professor[]>;
   createProfessor(professor: InsertProfessor): Promise<Professor>;
+  updateProfessor(id: number, professor: Partial<InsertProfessor>): Promise<Professor>;
+  deleteProfessor(id: number): Promise<void>;
 
   // Class operations
   getClasses(): Promise<Class[]>;
   createClass(class_: InsertClass): Promise<Class>;
+  updateClass(id: number, class_: Partial<InsertClass>): Promise<Class>;
+  deleteClass(id: number): Promise<void>;
+
+  // Room operations
+  getRooms(): Promise<Room[]>;
+  createRoom(room: InsertRoom): Promise<Room>;
+  updateRoom(id: number, room: Partial<InsertRoom>): Promise<Room>;
+  deleteRoom(id: number): Promise<void>;
 
   // Schedule operations
   getEvents(): Promise<ScheduleEvent[]>;
@@ -35,10 +45,6 @@ export interface IStorage {
   updateEvent(id: number, event: Partial<InsertEvent>): Promise<ScheduleEvent>;
   deleteEvent(id: number): Promise<void>;
   getEventsByDay(day: Day): Promise<ScheduleEvent[]>;
-
-  // Room operations
-  getRooms(): Promise<Room[]>;
-  createRoom(room: InsertRoom): Promise<Room>;
 
   // User operations
   getUser(id: number): Promise<User>;
@@ -68,6 +74,31 @@ export class DatabaseStorage implements IStorage {
     return newProf;
   }
 
+  async updateProfessor(id: number, professor: Partial<InsertProfessor>): Promise<Professor> {
+    const [updatedProf] = await db
+      .update(professors)
+      .set(professor)
+      .where(eq(professors.id, id))
+      .returning();
+
+    if (!updatedProf) {
+      throw new Error(`Professor with id ${id} not found`);
+    }
+
+    return updatedProf;
+  }
+
+  async deleteProfessor(id: number): Promise<void> {
+    const result = await db
+      .delete(professors)
+      .where(eq(professors.id, id))
+      .returning();
+
+    if (!result.length) {
+      throw new Error(`Professor with id ${id} not found`);
+    }
+  }
+
   async getClasses(): Promise<Class[]> {
     return await db.select().from(classes);
   }
@@ -77,6 +108,31 @@ export class DatabaseStorage implements IStorage {
     return newClass;
   }
 
+  async updateClass(id: number, class_: Partial<InsertClass>): Promise<Class> {
+    const [updatedClass] = await db
+      .update(classes)
+      .set(class_)
+      .where(eq(classes.id, id))
+      .returning();
+
+    if (!updatedClass) {
+      throw new Error(`Class with id ${id} not found`);
+    }
+
+    return updatedClass;
+  }
+
+  async deleteClass(id: number): Promise<void> {
+    const result = await db
+      .delete(classes)
+      .where(eq(classes.id, id))
+      .returning();
+
+    if (!result.length) {
+      throw new Error(`Class with id ${id} not found`);
+    }
+  }
+
   async getRooms(): Promise<Room[]> {
     return await db.select().from(rooms);
   }
@@ -84,6 +140,31 @@ export class DatabaseStorage implements IStorage {
   async createRoom(room: InsertRoom): Promise<Room> {
     const [newRoom] = await db.insert(rooms).values(room).returning();
     return newRoom;
+  }
+
+  async updateRoom(id: number, room: Partial<InsertRoom>): Promise<Room> {
+    const [updatedRoom] = await db
+      .update(rooms)
+      .set(room)
+      .where(eq(rooms.id, id))
+      .returning();
+
+    if (!updatedRoom) {
+      throw new Error(`Room with id ${id} not found`);
+    }
+
+    return updatedRoom;
+  }
+
+  async deleteRoom(id: number): Promise<void> {
+    const result = await db
+      .delete(rooms)
+      .where(eq(rooms.id, id))
+      .returning();
+
+    if (!result.length) {
+      throw new Error(`Room with id ${id} not found`);
+    }
   }
 
   async getEvents(): Promise<ScheduleEvent[]> {

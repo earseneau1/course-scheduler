@@ -19,6 +19,16 @@ import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Professor, Class, Room } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +40,10 @@ export default function AdminPage() {
   const [isCreatingProfessor, setIsCreatingProfessor] = useState(false);
   const [isCreatingClass, setIsCreatingClass] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [editingProfessor, setEditingProfessor] = useState<Professor | null>(null);
+  const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+  const [deletingItem, setDeletingItem] = useState<{ type: string; id: number } | null>(null);
 
   // Only super-admin can access this page
   if (user?.role !== "super-admin") {
@@ -53,7 +67,7 @@ export default function AdminPage() {
     queryKey: ["/api/rooms"],
   });
 
-  // Mutations for creating new items
+  // CRUD Mutations
   const createProfessorMutation = useMutation({
     mutationFn: async (name: string) => {
       const response = await fetch("/api/professors", {
@@ -78,6 +92,52 @@ export default function AdminPage() {
     },
   });
 
+  const updateProfessorMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Professor> }) => {
+      const response = await fetch(`/api/professors/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to update professor");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/professors"] });
+      setEditingProfessor(null);
+      toast({ title: "Professor updated successfully" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update professor",
+        variant: "destructive",
+        description: error.message,
+      });
+    },
+  });
+
+  const deleteProfessorMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/professors/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete professor");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/professors"] });
+      setDeletingItem(null);
+      toast({ title: "Professor deleted successfully" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete professor",
+        variant: "destructive",
+        description: error.message,
+      });
+    },
+  });
+
+  // Class mutations
   const createClassMutation = useMutation({
     mutationFn: async ({ name, code }: { name: string; code: string }) => {
       const response = await fetch("/api/classes", {
@@ -102,6 +162,52 @@ export default function AdminPage() {
     },
   });
 
+  const updateClassMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Class> }) => {
+      const response = await fetch(`/api/classes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to update class");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classes"] });
+      setEditingClass(null);
+      toast({ title: "Class updated successfully" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update class",
+        variant: "destructive",
+        description: error.message,
+      });
+    },
+  });
+
+  const deleteClassMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/classes/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete class");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classes"] });
+      setDeletingItem(null);
+      toast({ title: "Class deleted successfully" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete class",
+        variant: "destructive",
+        description: error.message,
+      });
+    },
+  });
+
+  // Room mutations
   const createRoomMutation = useMutation({
     mutationFn: async ({ name, capacity, building }: { name: string; capacity: number; building: string }) => {
       const response = await fetch("/api/rooms", {
@@ -126,7 +232,52 @@ export default function AdminPage() {
     },
   });
 
-  // Component for creating a new professor
+  const updateRoomMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Room> }) => {
+      const response = await fetch(`/api/rooms/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to update room");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
+      setEditingRoom(null);
+      toast({ title: "Room updated successfully" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update room",
+        variant: "destructive",
+        description: error.message,
+      });
+    },
+  });
+
+  const deleteRoomMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/rooms/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete room");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
+      setDeletingItem(null);
+      toast({ title: "Room deleted successfully" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete room",
+        variant: "destructive",
+        description: error.message,
+      });
+    },
+  });
+
+  // Create dialog components
   const CreateProfessorDialog = () => {
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -150,7 +301,41 @@ export default function AdminPage() {
     );
   };
 
-  // Component for creating a new class
+  // Edit dialog components
+  const EditProfessorDialog = () => {
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingProfessor) return;
+
+      const formData = new FormData(e.target as HTMLFormElement);
+      const name = formData.get("name") as string;
+
+      updateProfessorMutation.mutate({
+        id: editingProfessor.id,
+        data: { name },
+      });
+    };
+
+    return (
+      <Dialog open={!!editingProfessor} onOpenChange={() => setEditingProfessor(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Professor</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              name="name"
+              placeholder="Professor Name"
+              defaultValue={editingProfessor?.name}
+              required
+            />
+            <Button type="submit">Update Professor</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   const CreateClassDialog = () => {
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -176,7 +361,47 @@ export default function AdminPage() {
     );
   };
 
-  // Component for creating a new room
+  const EditClassDialog = () => {
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingClass) return;
+
+      const formData = new FormData(e.target as HTMLFormElement);
+      const name = formData.get("name") as string;
+      const code = formData.get("code") as string;
+
+      updateClassMutation.mutate({
+        id: editingClass.id,
+        data: { name, code },
+      });
+    };
+
+    return (
+      <Dialog open={!!editingClass} onOpenChange={() => setEditingClass(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Class</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              name="name"
+              placeholder="Class Name"
+              defaultValue={editingClass?.name}
+              required
+            />
+            <Input
+              name="code"
+              placeholder="Class Code"
+              defaultValue={editingClass?.code}
+              required
+            />
+            <Button type="submit">Update Class</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   const CreateRoomDialog = () => {
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -203,6 +428,91 @@ export default function AdminPage() {
           </form>
         </DialogContent>
       </Dialog>
+    );
+  };
+
+  const EditRoomDialog = () => {
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingRoom) return;
+
+      const formData = new FormData(e.target as HTMLFormElement);
+      const name = formData.get("name") as string;
+      const capacity = parseInt(formData.get("capacity") as string);
+      const building = formData.get("building") as string;
+
+      updateRoomMutation.mutate({
+        id: editingRoom.id,
+        data: { name, capacity, building },
+      });
+    };
+
+    return (
+      <Dialog open={!!editingRoom} onOpenChange={() => setEditingRoom(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Room</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              name="name"
+              placeholder="Room Name"
+              defaultValue={editingRoom?.name}
+              required
+            />
+            <Input
+              name="capacity"
+              type="number"
+              placeholder="Capacity"
+              defaultValue={editingRoom?.capacity}
+              required
+            />
+            <Input
+              name="building"
+              placeholder="Building"
+              defaultValue={editingRoom?.building}
+              required
+            />
+            <Button type="submit">Update Room</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  // Delete confirmation dialog
+  const DeleteConfirmationDialog = () => {
+    if (!deletingItem) return null;
+
+    const handleDelete = () => {
+      switch (deletingItem.type) {
+        case "professor":
+          deleteProfessorMutation.mutate(deletingItem.id);
+          break;
+        case "class":
+          deleteClassMutation.mutate(deletingItem.id);
+          break;
+        case "room":
+          deleteRoomMutation.mutate(deletingItem.id);
+          break;
+      }
+    };
+
+    return (
+      <AlertDialog open={!!deletingItem} onOpenChange={() => setDeletingItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this {deletingItem.type}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     );
   };
 
@@ -241,10 +551,23 @@ export default function AdminPage() {
                   <TableCell key={col}>{item[col.toLowerCase()]}</TableCell>
                 ))}
                 <TableCell className="text-right space-x-2">
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (title === "Professors") setEditingProfessor(item);
+                      if (title === "Classes") setEditingClass(item);
+                      if (title === "Rooms") setEditingRoom(item);
+                    }}
+                  >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="sm" className="text-destructive">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => setDeletingItem({ type: title.toLowerCase().slice(0, -1), id: item.id })}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </TableCell>
@@ -267,6 +590,12 @@ export default function AdminPage() {
       <CreateProfessorDialog />
       <CreateClassDialog />
       <CreateRoomDialog />
+
+      <EditProfessorDialog />
+      <EditClassDialog />
+      <EditRoomDialog />
+
+      <DeleteConfirmationDialog />
     </div>
   );
 }
