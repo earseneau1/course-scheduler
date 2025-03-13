@@ -29,6 +29,12 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
     e.preventDefault();
     e.stopPropagation();
 
+    if (e.target instanceof Element && 
+        (e.target.closest('button') || 
+         e.target.closest('.resize-handle'))) {
+      return;
+    }
+
     startY.current = e.clientY;
     initialTop.current = event.startTime;
     initialHeight.current = event.duration;
@@ -112,9 +118,9 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
         />
 
         {/* Event content */}
-        <div className="p-2 relative">
+        <div className="p-2 h-full flex flex-col relative">
           {/* Top row with assign buttons */}
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex justify-between items-center">
             <Button
               variant="ghost"
               size="icon"
@@ -147,7 +153,7 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
 
           {/* Bottom section with duration presets and delete */}
           {!event.repeatPattern && (
-            <div className="mt-1">
+            <div className="absolute bottom-1 left-1 right-1">
               <div className="flex justify-between items-center">
                 {/* Delete button on the left */}
                 <Button
