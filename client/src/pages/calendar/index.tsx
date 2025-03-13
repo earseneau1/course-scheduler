@@ -3,6 +3,8 @@ import { Professor, Class, Room, ScheduleEvent } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Trash2, UserCircle2, BookOpen, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import "./Calendar.css";
 
 // Types
@@ -108,7 +110,6 @@ const Calendar: React.FC = () => {
     },
   });
 
-  // Event handling functions
   const syncRepeatedEvents = (masterEvent: CalendarEvent) => {
     if (!masterEvent.repeatGroup) return;
     setEvents(prevEvents =>
@@ -305,6 +306,149 @@ const Calendar: React.FC = () => {
     });
   };
 
+  const renderEventContent = (ev: CalendarEvent) => {
+    return (
+      <>
+        {/* Top buttons */}
+        <div className="absolute top-1 left-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 bg-white/90 hover:bg-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              const newProf = prompt("Assign Professor", ev.professor?.name || "");
+              if (newProf !== null) {
+                setEvents(prev =>
+                  prev.map(event =>
+                    event.id === ev.id ? { ...event, professor: { name: newProf } } : event
+                  )
+                );
+                syncRepeatedEvents({ ...ev, professor: { name: newProf } });
+              }
+            }}
+          >
+            <UserCircle2 className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="absolute top-1 right-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 bg-white/90 hover:bg-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              const newClass = prompt("Assign Class", ev.classAssigned?.name || "");
+              if (newClass !== null) {
+                setEvents(prev =>
+                  prev.map(event =>
+                    event.id === ev.id ? { ...event, classAssigned: { name: newClass } } : event
+                  )
+                );
+                syncRepeatedEvents({ ...ev, classAssigned: { name: newClass } });
+              }
+            }}
+          >
+            <BookOpen className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Centered time display */}
+        <div className="absolute inset-0 flex items-center justify-center text-xs font-medium">
+          {formatTime(Math.round(pxToMinutes(ev.top)))} -{" "}
+          {formatTime(Math.round(pxToMinutes(ev.top + ev.height)))}
+        </div>
+
+        {/* Bottom buttons */}
+        <div className="absolute bottom-1 left-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 bg-white/90 hover:bg-white text-red-600 hover:text-red-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm("Delete this event and its repeats?")) {
+                setEvents(prev =>
+                  prev.filter(
+                    event => event.id !== ev.id && event.repeatGroup !== ev.repeatGroup
+                  )
+                );
+              }
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="absolute bottom-1 right-1 flex gap-1">
+          {!ev.isRepeat && ev.day !== "Tuesday" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 bg-white/90 hover:bg-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                ev.height = minutesToPx(50);
+                syncRepeatedEvents(ev);
+                checkAndCreateRepeats(ev, true);
+              }}
+            >
+              <Clock className="h-3 w-3 mr-1" />
+              50
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 bg-white/90 hover:bg-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              ev.height = minutesToPx(80);
+              syncRepeatedEvents(ev);
+              checkAndCreateRepeats(ev, true);
+            }}
+          >
+            <Clock className="h-3 w-3 mr-1" />
+            80
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 bg-white/90 hover:bg-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              ev.height = minutesToPx(160);
+              syncRepeatedEvents(ev);
+              checkAndCreateRepeats(ev, true);
+            }}
+          >
+            <Clock className="h-3 w-3 mr-1" />
+            160
+          </Button>
+        </div>
+
+        {/* Additional info */}
+        <div className="absolute top-8 left-1 right-1 text-xs space-y-0.5">
+          {ev.professor && (
+            <div className="text-gray-600">{ev.professor.name}</div>
+          )}
+          {ev.classAssigned && (
+            <div className="text-gray-600">
+              {ev.classAssigned.prefix} {ev.classAssigned.code}
+            </div>
+          )}
+          {ev.room && (
+            <div className="text-gray-600">{ev.room.name}</div>
+          )}
+          {ev.repeatPattern && (
+            <div className="text-gray-500">
+              Pattern: {ev.repeatPattern}
+            </div>
+          )}
+        </div>
+      </>
+    );
+  };
+
   // Render calendar grid
   return (
     <div className="container mx-auto p-4">
@@ -379,15 +523,20 @@ const Calendar: React.FC = () => {
                       key={ev.id}
                       className={`absolute left-1 right-1 rounded shadow-sm cursor-grab 
                         ${ev.isRepeat ? 'bg-green-100' : 'bg-blue-100'}
-                        ${dragState?.eventId === ev.id ? 'opacity-75' : 'opacity-100'}
+                        ${dragState?.eventId === ev.id ? 'opacity-75 cursor-grabbing' : 'opacity-100'}
+                        transition-all duration-200
                       `}
                       style={{
                         top: ev.top,
                         height: ev.height,
+                        position: 'absolute',
+                        transform: dragState?.eventId === ev.id ? 'scale(0.98)' : 'scale(1)',
+                        pointerEvents: dragState?.eventId === ev.id ? 'none' : 'auto',
                       }}
                       onMouseDown={(e) => {
                         const target = e.target as HTMLElement;
-                        if (target.classList.contains("resize-handle")) return;
+                        if (target.closest('button')) return;
+                        if (target.classList.contains('resize-handle')) return;
 
                         setDragState({
                           eventId: ev.id,
@@ -402,57 +551,22 @@ const Calendar: React.FC = () => {
                       {!ev.isRepeat && (
                         <>
                           <div
-                            className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize bg-gray-200 rounded-t"
+                            className="resize-handle top"
                             onMouseDown={(e) => {
                               e.stopPropagation();
-                              setDragState({
-                                eventId: ev.id,
-                                dragType: "resize-top",
-                                startY: e.clientY,
-                                initialTop: ev.top,
-                                initialHeight: ev.height,
-                              });
+                              handleEventMouseDown(e, ev, "resize-top");
                             }}
                           />
                           <div
-                            className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize bg-gray-200 rounded-b"
+                            className="resize-handle bottom"
                             onMouseDown={(e) => {
                               e.stopPropagation();
-                              setDragState({
-                                eventId: ev.id,
-                                dragType: "resize-bottom",
-                                startY: e.clientY,
-                                initialTop: ev.top,
-                                initialHeight: ev.height,
-                              });
+                              handleEventMouseDown(e, ev, "resize-bottom");
                             }}
                           />
                         </>
                       )}
-
-                      {/* Event content */}
-                      <div className="p-2 text-xs">
-                        <div className="font-bold">
-                          {formatTime(Math.round(pxToMinutes(ev.top)))} -{" "}
-                          {formatTime(Math.round(pxToMinutes(ev.top + ev.height)))}
-                        </div>
-                        {ev.professor && (
-                          <div className="text-gray-600">{ev.professor.name}</div>
-                        )}
-                        {ev.classAssigned && (
-                          <div className="text-gray-600">
-                            {ev.classAssigned.prefix} {ev.classAssigned.code}
-                          </div>
-                        )}
-                        {ev.room && (
-                          <div className="text-gray-600">{ev.room.name}</div>
-                        )}
-                        {ev.repeatPattern && (
-                          <div className="text-gray-500 text-xs">
-                            Pattern: {ev.repeatPattern}
-                          </div>
-                        )}
-                      </div>
+                      {renderEventContent(ev)}
                     </div>
                   ))}
               </div>

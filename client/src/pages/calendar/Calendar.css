@@ -9,21 +9,23 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+.container {
+  @apply bg-white rounded-lg shadow-sm;
+}
+
 .time-gutter {
   width: 4rem;
   border-right: 1px solid #e5e7eb;
   background-color: #f9fafb;
 }
 
+/* Calendar Grid */
 .day-column {
+  @apply relative border-r border-gray-100 last:border-r-0;
   position: relative;
   flex: 1;
-  border-right: 1px solid #e5e7eb;
 }
 
-.day-column:last-child {
-  border-right: none;
-}
 
 /* Event Styling */
 .calendar-event {
@@ -36,20 +38,110 @@
   transition: all 0.2s;
 }
 
-.calendar-event:hover {
+.event {
+  @apply relative rounded-md shadow-sm transition-all duration-200;
+  min-height: 80px;
+  user-select: none;
+}
+
+.event:hover {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   transform: translateY(-1px);
 }
 
-.calendar-event.repeat {
+.event.dragging {
+  cursor: grabbing !important;
+  opacity: 0.75;
+  transform: scale(0.98);
+  z-index: 100;
+}
+
+.calendar-event:hover,
+.event:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.calendar-event.repeat,
+.event.repeat {
+  @apply opacity-80 pointer-events-none;
   background-color: #86efac;
   opacity: 0.8;
 }
 
 .event-content {
+  @apply relative h-full;
   padding: 0.5rem;
   font-size: 0.75rem;
   line-height: 1rem;
+}
+
+/* Resize Handles */
+.resize-handle {
+  @apply absolute left-0 right-0 h-2 bg-white/50 hover:bg-white/70 transition-colors;
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background-color: rgba(255, 255, 255, 0.3);
+  cursor: ns-resize;
+  z-index: 20;
+}
+
+.resize-handle.top {
+  @apply top-0 rounded-t-md;
+  top: -3px;
+}
+
+.resize-handle.bottom {
+  @apply bottom-0 rounded-b-md;
+  bottom: -3px;
+}
+
+.resize-handle:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Time Grid */
+.hour-line {
+  @apply absolute w-full h-px bg-gray-200;
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: #e5e7eb;
+}
+
+.half-hour-line {
+  @apply absolute w-full h-px bg-gray-100;
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: #f3f4f6;
+}
+
+/* Button Hover Effects */
+.event button {
+  @apply opacity-80 hover:opacity-100 transition-opacity;
+}
+
+/* Time Display */
+.time-display {
+  @apply font-medium text-gray-700;
+}
+
+.day-column:last-child {
+  border-right: none;
+}
+
+/* Time Labels */
+.time-label {
+  position: absolute;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  color: #6b7280;
 }
 
 .event-time {
@@ -60,54 +152,4 @@
 .event-details {
   margin-top: 0.25rem;
   color: #4b5563;
-}
-
-.resize-handle {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 0.5rem;
-  background-color: rgba(255, 255, 255, 0.3);
-  cursor: ns-resize;
-  transition: background-color 0.2s;
-}
-
-.resize-handle:hover {
-  background-color: rgba(255, 255, 255, 0.5);
-}
-
-.resize-handle.top {
-  top: 0;
-  border-radius: 0.375rem 0.375rem 0 0;
-}
-
-.resize-handle.bottom {
-  bottom: 0;
-  border-radius: 0 0 0.375rem 0.375rem;
-}
-
-/* Grid Lines */
-.hour-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background-color: #e5e7eb;
-}
-
-.half-hour-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background-color: #f3f4f6;
-}
-
-/* Time Labels */
-.time-label {
-  position: absolute;
-  right: 0.5rem;
-  transform: translateY(-50%);
-  font-size: 0.75rem;
-  color: #6b7280;
 }
