@@ -35,10 +35,12 @@ export const professors = pgTable("professors", {
   name: text("name").notNull(),
 });
 
+// Update the classes table definition to include prefix
 export const classes = pgTable("classes", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull(),
+  prefix: text("prefix").notNull(),
   termId: integer("term_id").references(() => terms.id),
 });
 

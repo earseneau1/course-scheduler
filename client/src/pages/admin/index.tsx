@@ -84,10 +84,10 @@ export default function AdminPage() {
       toast({ title: "Professor created successfully" });
     },
     onError: (error) => {
-      toast({ 
-        title: "Failed to create professor", 
+      toast({
+        title: "Failed to create professor",
         variant: "destructive",
-        description: error.message 
+        description: error.message,
       });
     },
   });
@@ -139,11 +139,11 @@ export default function AdminPage() {
 
   // Class mutations
   const createClassMutation = useMutation({
-    mutationFn: async ({ name, code }: { name: string; code: string }) => {
+    mutationFn: async ({ name, code, prefix }: { name: string; code: string; prefix: string }) => {
       const response = await fetch("/api/classes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, code }),
+        body: JSON.stringify({ name, code, prefix }),
       });
       if (!response.ok) throw new Error("Failed to create class");
       return response.json();
@@ -154,10 +154,10 @@ export default function AdminPage() {
       toast({ title: "Class created successfully" });
     },
     onError: (error) => {
-      toast({ 
-        title: "Failed to create class", 
+      toast({
+        title: "Failed to create class",
         variant: "destructive",
-        description: error.message 
+        description: error.message,
       });
     },
   });
@@ -224,10 +224,10 @@ export default function AdminPage() {
       toast({ title: "Room created successfully" });
     },
     onError: (error) => {
-      toast({ 
-        title: "Failed to create room", 
+      toast({
+        title: "Failed to create room",
         variant: "destructive",
-        description: error.message 
+        description: error.message,
       });
     },
   });
@@ -342,7 +342,8 @@ export default function AdminPage() {
       const formData = new FormData(e.target as HTMLFormElement);
       const name = formData.get("name") as string;
       const code = formData.get("code") as string;
-      if (name && code) createClassMutation.mutate({ name, code });
+      const prefix = formData.get("prefix") as string;
+      if (name && code && prefix) createClassMutation.mutate({ name, code, prefix });
     };
 
     return (
@@ -353,6 +354,7 @@ export default function AdminPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input name="name" placeholder="Class Name" required />
+            <Input name="prefix" placeholder="Class Prefix" required />
             <Input name="code" placeholder="Class Code" required />
             <Button type="submit">Create Class</Button>
           </form>
@@ -369,11 +371,12 @@ export default function AdminPage() {
       const formData = new FormData(e.target as HTMLFormElement);
       const name = formData.get("name") as string;
       const code = formData.get("code") as string;
+      const prefix = formData.get("prefix") as string;
       const termId = parseInt(formData.get("termId") as string) || null;
 
       updateClassMutation.mutate({
         id: editingClass.id,
-        data: { name, code, termId },
+        data: { name, code, prefix, termId },
       });
     };
 
@@ -388,6 +391,12 @@ export default function AdminPage() {
               name="name"
               placeholder="Class Name"
               defaultValue={editingClass?.name}
+              required
+            />
+            <Input
+              name="prefix"
+              placeholder="Class Prefix"
+              defaultValue={editingClass?.prefix}
               required
             />
             <Input
@@ -591,7 +600,7 @@ export default function AdminPage() {
       <h1 className="text-4xl font-bold mb-8">Admin Dashboard</h1>
 
       {renderTable("Professors", professors, ["Name"])}
-      {renderTable("Classes", classes, ["Name", "Code"])}
+      {renderTable("Classes", classes, ["Name", "Prefix", "Code"])}
       {renderTable("Rooms", rooms, ["Name", "Capacity", "Building"])}
 
       <CreateProfessorDialog />
