@@ -42,6 +42,8 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
 
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
+      e.stopPropagation();
+
       const deltaY = e.clientY - startY.current;
       const deltaMins = pxToMinutes(deltaY);
 
@@ -64,10 +66,14 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
       }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
       setDragging(false);
       setResizing(null);
       setIsDragging(false);
+
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
@@ -80,7 +86,7 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
     <>
       <Card
         className={cn(
-          "absolute left-1 right-1 overflow-hidden",
+          "absolute left-1 right-1 overflow-hidden event",
           event.repeatPattern ? "opacity-70" : "",
           isDragging ? "cursor-grabbing" : "cursor-grab"
         )}
@@ -92,11 +98,11 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
       >
         {/* Resize handles */}
         <div
-          className="absolute inset-x-0 top-0 h-2 cursor-ns-resize"
+          className="absolute inset-x-0 top-0 h-2 cursor-ns-resize resize-handle"
           onMouseDown={(e) => handleMouseDown(e, "resize-top")}
         />
         <div
-          className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize"
+          className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize resize-handle"
           onMouseDown={(e) => handleMouseDown(e, "resize-bottom")}
         />
 

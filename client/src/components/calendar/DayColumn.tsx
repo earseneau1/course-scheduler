@@ -21,6 +21,15 @@ export function DayColumn({ day, events, onEventCreate, onEventUpdate, onEventDe
   const handleColumnClick = (e: React.MouseEvent) => {
     if (!columnRef.current || isDragging) return;
 
+    // Check if we clicked on an event or its children
+    if (e.target instanceof Element && (
+      e.target.closest('.event') ||
+      e.target.closest('button') ||
+      e.target.closest('.resize-handle')
+    )) {
+      return;
+    }
+
     const rect = columnRef.current.getBoundingClientRect();
     const clickY = e.clientY - rect.top;
     const clickMinutes = pxToMinutes(clickY);
