@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { minutesToPx, pxToMinutes, formatTime, snapTime } from "@/lib/time";
 import { AssignProfessorDialog } from "@/components/dialogs/AssignProfessorDialog";
 import { AssignClassDialog } from "@/components/dialogs/AssignClassDialog";
-import { Trash2, GripVertical, UserPlus, BookOpen } from "lucide-react";
+import { Trash2, UserPlus, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EventBlockProps {
@@ -44,26 +44,24 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
       e.preventDefault();
       e.stopPropagation();
 
-      if (!isDragging && !isResizing) return;
-
       const deltaY = e.clientY - startY.current;
       const deltaMins = pxToMinutes(deltaY);
 
       if (isDragging) {
-        const newStartTime = snapTime(initialTop.current + deltaMins);
-        onUpdate({ id: event.id, startTime: newStartTime });
+        const newStartTime = initialTop.current + deltaMins;
+        onUpdate({ id: event.id, startTime: snapTime(newStartTime) });
       } else if (isResizing) {
         if (isResizing === "top") {
-          const newStartTime = snapTime(initialTop.current + deltaMins);
-          const newDuration = initialHeight.current - (newStartTime - initialTop.current);
+          const newStartTime = initialTop.current + deltaMins;
+          const newDuration = initialHeight.current - deltaMins;
           onUpdate({ 
             id: event.id, 
-            startTime: newStartTime,
-            duration: newDuration
+            startTime: snapTime(newStartTime),
+            duration: snapTime(newDuration)
           });
         } else {
-          const newDuration = snapTime(initialHeight.current + deltaMins);
-          onUpdate({ id: event.id, duration: newDuration });
+          const newDuration = initialHeight.current + deltaMins;
+          onUpdate({ id: event.id, duration: snapTime(newDuration) });
         }
       }
     };
@@ -100,6 +98,7 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
           top: minutesToPx(event.startTime),
           height: minutesToPx(event.duration),
         }}
+        onMouseDown={(e) => handleMouseDown(e, "move")}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Resize handles */}
@@ -141,21 +140,14 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
             </Button>
           </div>
 
-          {/* Middle section with time and drag handle */}
+          {/* Time display */}
           <div className="text-xs text-center mt-1">
             {formatTime(event.startTime)} - {formatTime(event.startTime + event.duration)}
-          </div>
-          <div 
-            className="flex flex-col items-center justify-center py-1"
-            onMouseDown={(e) => handleMouseDown(e, "move")}
-          >
-            <GripVertical className="h-4 w-4 text-gray-400" />
           </div>
 
           {/* Bottom section with duration presets and delete */}
           {!event.repeatPattern && (
             <div className="mt-1">
-              {/* Duration presets */}
               <div className="flex justify-between items-center">
                 {/* Delete button on the left */}
                 <Button
