@@ -191,11 +191,13 @@ export default function AdminPage() {
 
   const deleteClassMutation = useMutation({
     mutationFn: async (id: number) => {
+      console.log('Attempting to delete class:', id);
       const response = await fetch(`/api/classes/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ message: 'Failed to delete class' }));
+        console.error('Delete class error:', error);
         throw new Error(error.message || "Failed to delete class");
       }
     },
@@ -205,6 +207,7 @@ export default function AdminPage() {
       toast({ title: "Class deleted successfully" });
     },
     onError: (error) => {
+      console.error('Delete class mutation error:', error);
       toast({
         title: "Failed to delete class",
         variant: "destructive",
@@ -267,10 +270,7 @@ export default function AdminPage() {
       const response = await fetch(`/api/rooms/${id}`, {
         method: "DELETE",
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to delete room");
-      }
+      if (!response.ok) throw new Error("Failed to delete room");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
@@ -603,6 +603,7 @@ export default function AdminPage() {
       </CardContent>
     </Card>
   );
+  };
 
   return (
     <div className="container mx-auto p-8">

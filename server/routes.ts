@@ -90,6 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/classes/:id", async (req, res) => {
     const idParam = z.coerce.number().safeParse(req.params.id);
     if (!idParam.success) {
+      console.error('Invalid class ID:', req.params.id);
       return res.status(400).json({ error: "Invalid ID" });
     }
 
@@ -97,6 +98,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteClass(idParam.data);
       res.status(204).send();
     } catch (error) {
+      console.error('Error deleting class:', error);
       res.status(404).json({ error: (error as Error).message });
     }
   });
