@@ -69,10 +69,10 @@ export class MemStorage implements IStorage {
     ];
 
     const sampleClasses = [
-      { name: "Mathematics 101", code: "MATH101" },
-      { name: "History 202", code: "HIST202" },
-      { name: "Biology 303", code: "BIO303" },
-      { name: "Chemistry 404", code: "CHEM404" }
+      { name: "Mathematics 101", code: "MATH101", termId: null },
+      { name: "History 202", code: "HIST202", termId: null },
+      { name: "Biology 303", code: "BIO303", termId: null },
+      { name: "Chemistry 404", code: "CHEM404", termId: null }
     ];
 
     sampleProfessors.forEach(p => this.createProfessor(p));
@@ -96,7 +96,7 @@ export class MemStorage implements IStorage {
 
   async createClass(class_: InsertClass): Promise<Class> {
     const id = this.currentIds.class++;
-    const newClass = { ...class_, id };
+    const newClass = { ...class_, id, termId: class_.termId ?? null };
     this.classes.set(id, newClass);
     return newClass;
   }
@@ -107,7 +107,16 @@ export class MemStorage implements IStorage {
 
   async createEvent(event: InsertEvent): Promise<ScheduleEvent> {
     const id = this.currentIds.event++;
-    const newEvent = { ...event, id };
+    const newEvent = {
+      ...event,
+      id,
+      termId: event.termId ?? null,
+      professorId: event.professorId ?? null,
+      classId: event.classId ?? null,
+      roomId: event.roomId ?? null,
+      repeatPattern: event.repeatPattern ?? null,
+      repeatGroupId: event.repeatGroupId ?? null
+    };
     this.events.set(id, newEvent);
     return newEvent;
   }
@@ -115,7 +124,7 @@ export class MemStorage implements IStorage {
   async updateEvent(id: number, event: Partial<InsertEvent>): Promise<ScheduleEvent> {
     const existingEvent = this.events.get(id);
     if (!existingEvent) throw new Error(`Event with id ${id} not found`);
-    
+
     const updatedEvent = { ...existingEvent, ...event };
     this.events.set(id, updatedEvent);
     return updatedEvent;
@@ -141,7 +150,12 @@ export class MemStorage implements IStorage {
 
   async createUser(user: Omit<InsertUser, "confirmPassword">): Promise<User> {
     const id = this.currentIds.user++;
-    const newUser = { ...user, id, createdAt: new Date() };
+    const newUser: User = {
+      ...user,
+      id,
+      role: user.role ?? "faculty",
+      createdAt: new Date()
+    };
     this.users.set(id, newUser);
     return newUser;
   }

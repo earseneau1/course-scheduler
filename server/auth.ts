@@ -5,7 +5,7 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser } from "@shared/schema";
+import { User as SelectUser, insertUserSchema } from "@shared/schema";
 
 declare global {
   namespace Express {
@@ -71,21 +71,31 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
+      // Validate request body against schema
+      const result = insertUserSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error.format() });
+      }
+
       const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
+        return res.status(400).json({ error: { message: "Username already exists" } });
       }
 
       const user = await storage.createUser({
-        ...req.body,
-        password: await hashPassword(req.body.password),
+        ...result.data,
+        password: await hashPassword(result.data.password),
       });
 
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          console.error("Login error after registration:", err);
+          return res.status(500).json({ error: { message: "Error logging in after registration" } });
+        }
         res.status(201).json(user);
       });
     } catch (error) {
+      console.error("Registration error:", error);
       next(error);
     }
   });
@@ -93,8 +103,8 @@ export function setupAuth(app: Express) {
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err, user, info) => {
       if (err) return next(err);
-      if (!user) return res.status(401).json({ message: info?.message || "Invalid credentials" });
-      
+      if (!user) return res.status(401).json({ error: { message: info?.message || "Invalid credentials" } });
+
       req.login(user, (err) => {
         if (err) return next(err);
         res.json(user);
