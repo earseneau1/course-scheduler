@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -40,12 +40,6 @@ export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [tab, setTab] = useState<"login" | "register">("login");
 
-  // Redirect if already logged in
-  if (user) {
-    setLocation("/");
-    return null;
-  }
-
   const loginForm = useForm({
     defaultValues: {
       username: "",
@@ -62,6 +56,18 @@ export default function AuthPage() {
       role: "faculty" as const,
     },
   });
+
+  // Use useEffect for navigation after render
+  useEffect(() => {
+    if (user) {
+      setLocation("/");
+    }
+  }, [user, setLocation]);
+
+  // If loading, you could show a loading state
+  if (user) {
+    return null; // or loading spinner
+  }
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
