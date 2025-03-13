@@ -34,6 +34,12 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
+const typeMap: { [key: string]: string } = {
+  "Professors": "professor",
+  "Classes": "class",
+  "Rooms": "room"
+};
+
 export default function AdminPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -370,7 +376,10 @@ export default function AdminPage() {
                     variant="outline"
                     size="sm"
                     className="text-destructive"
-                    onClick={() => setDeletingItem({ type: title.toLowerCase().slice(0, -1), id: item.id })}
+                    onClick={() => setDeletingItem({ 
+                      type: typeMap[title], 
+                      id: item.id 
+                    })}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
