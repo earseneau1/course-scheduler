@@ -7,8 +7,18 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import { scrypt, randomBytes } from "crypto";
+import { promisify } from "util";
 
 const MemoryStore = createMemoryStore(session);
+const scryptAsync = promisify(scrypt);
+
+// Helper function to hash the initial admin password
+async function hashInitialPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${buf.toString("hex")}.${salt}`;
+}
 
 export interface IStorage {
   // Professor operations
@@ -53,10 +63,16 @@ export class MemStorage implements IStorage {
       checkPeriod: 86400000 // prune expired entries every 24h
     });
 
-    // Add initial admin user
+    // Initialize the storage with sample data
+    this.initializeData();
+  }
+
+  private async initializeData() {
+    // Add initial admin user with hashed password
+    const hashedPassword = await hashInitialPassword("admin");
     this.createUser({
       username: "admin",
-      password: "admin", // This would be hashed in production
+      password: hashedPassword,
       role: "admin"
     });
 

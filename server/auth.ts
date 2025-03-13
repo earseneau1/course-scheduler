@@ -49,11 +49,18 @@ export function setupAuth(app: Express) {
     new LocalStrategy(async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
+        if (!user) {
           return done(null, false, { message: "Invalid username or password" });
         }
+
+        const isValid = await comparePasswords(password, user.password);
+        if (!isValid) {
+          return done(null, false, { message: "Invalid username or password" });
+        }
+
         return done(null, user);
       } catch (error) {
+        console.error("Login error:", error);
         return done(error);
       }
     }),
@@ -82,9 +89,10 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ error: { message: "Username already exists" } });
       }
 
+      const hashedPassword = await hashPassword(result.data.password);
       const user = await storage.createUser({
         ...result.data,
-        password: await hashPassword(result.data.password),
+        password: hashedPassword,
       });
 
       req.login(user, (err) => {
@@ -101,12 +109,20 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
-      if (err) return next(err);
-      if (!user) return res.status(401).json({ error: { message: info?.message || "Invalid credentials" } });
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) {
+        console.error("Authentication error:", err);
+        return next(err);
+      }
+      if (!user) {
+        return res.status(401).json({ error: { message: info?.message || "Invalid credentials" } });
+      }
 
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          console.error("Login session error:", err);
+          return next(err);
+        }
         res.json(user);
       });
     })(req, res, next);
