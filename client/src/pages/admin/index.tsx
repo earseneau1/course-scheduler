@@ -121,7 +121,10 @@ export default function AdminPage() {
       const response = await fetch(`/api/professors/${id}`, {
         method: "DELETE",
       });
-      if (!response.ok) throw new Error("Failed to delete professor");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to delete professor");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/professors"] });
@@ -191,7 +194,10 @@ export default function AdminPage() {
       const response = await fetch(`/api/classes/${id}`, {
         method: "DELETE",
       });
-      if (!response.ok) throw new Error("Failed to delete class");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to delete class");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/classes"] });
@@ -261,7 +267,10 @@ export default function AdminPage() {
       const response = await fetch(`/api/rooms/${id}`, {
         method: "DELETE",
       });
-      if (!response.ok) throw new Error("Failed to delete room");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to delete room");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
