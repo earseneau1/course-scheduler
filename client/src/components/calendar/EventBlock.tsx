@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { minutesToPx, pxToMinutes, formatTime, snapTime } from "@/lib/time";
 import { AssignProfessorDialog } from "@/components/dialogs/AssignProfessorDialog";
 import { AssignClassDialog } from "@/components/dialogs/AssignClassDialog";
-import { Trash2, GripVertical } from "lucide-react";
+import { Trash2, GripVertical, UserPlus, BookOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface EventBlockProps {
   event: ScheduleEvent;
@@ -75,65 +76,80 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
   return (
     <>
       <Card
-        className={`absolute left-1 right-1 ${
-          event.repeatPattern ? "opacity-70" : ""
-        }`}
+        className={cn(
+          "absolute left-1 right-1 overflow-hidden",
+          event.repeatPattern ? "opacity-70" : "",
+          isDragging ? "cursor-grabbing" : "cursor-grab"
+        )}
         style={{
           top: minutesToPx(event.startTime),
           height: minutesToPx(event.duration),
-          cursor: isDragging ? "grabbing" : "grab",
         }}
       >
+        {/* Resize handles */}
         <div
           className="absolute inset-x-0 top-0 h-2 cursor-ns-resize"
           onMouseDown={(e) => handleMouseDown(e, "resize-top")}
         />
-
-        <div className="p-2">
-          <div className="flex justify-between items-center mb-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowProfessorDialog(true)}
-            >
-              {event.professorId ? "Prof. Assigned" : "Assign Professor"}
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowClassDialog(true)}
-            >
-              {event.classId ? "Class Assigned" : "Assign Class"}
-            </Button>
-          </div>
-
-          <div 
-            className="flex items-center justify-center"
-            onMouseDown={(e) => handleMouseDown(e, "move")}
-          >
-            <GripVertical className="h-4 w-4 text-gray-400" />
-            <span className="ml-2">
-              {formatTime(event.startTime)} - {formatTime(event.startTime + event.duration)}
-            </span>
-          </div>
-
-          {!event.repeatPattern && (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="mt-2"
-              onClick={() => onDelete(event.id)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-
         <div
           className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize"
           onMouseDown={(e) => handleMouseDown(e, "resize-bottom")}
         />
+
+        {/* Event content */}
+        <div className="p-2">
+          {/* Top row with assign buttons */}
+          <div className="flex justify-between items-center mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-1"
+              onClick={() => setShowProfessorDialog(true)}
+            >
+              <UserPlus className="h-4 w-4" />
+              <span className="text-xs">
+                {event.professorId ? "Prof. Assigned" : "Assign Prof"}
+              </span>
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-1"
+              onClick={() => setShowClassDialog(true)}
+            >
+              <BookOpen className="h-4 w-4" />
+              <span className="text-xs">
+                {event.classId ? "Class Assigned" : "Assign Class"}
+              </span>
+            </Button>
+          </div>
+
+          {/* Middle section with drag handle and time */}
+          <div 
+            className="flex items-center justify-center py-2"
+            onMouseDown={(e) => handleMouseDown(e, "move")}
+          >
+            <GripVertical className="h-4 w-4 text-gray-400" />
+            <span className="ml-2 text-sm">
+              {formatTime(event.startTime)} - {formatTime(event.startTime + event.duration)}
+            </span>
+          </div>
+
+          {/* Bottom row with delete button */}
+          {!event.repeatPattern && (
+            <div className="flex justify-center mt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive/90"
+                onClick={() => onDelete(event.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
       </Card>
 
       <AssignProfessorDialog
