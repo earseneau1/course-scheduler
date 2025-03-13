@@ -1,0 +1,608 @@
+import React, { useState, useRef, useEffect } from 'react';
+import './Calendar.css'; // Optional: include CSS styles for layout
+
+// Types for calendar events
+interface CalendarEvent {
+  id: string;
+  day: string;
+  top: number;
+  height: number;
+  isRepeat: boolean;
+  repeatGroup?: string;
+  repeatPattern?: string;
+  professor?: string;
+  classAssigned?: string;
+  master?: boolean;
+  justCreated?: boolean;
+}
+
+// Configuration constants
+const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const restrictedDays = ["Wednesday", "Thursday", "Friday"];
+const startHour = 8, endHour = 18, hourHeight = 100;
+const defaultEventDuration = 80, minDuration = 30;
+const restrictionStart = 9 * 60;
+
+// Helper functions
+function generateUniqueId(): string {
+  return Date.now().toString() + Math.floor(Math.random() * 1000).toString();
+}
+function minutesToPx(minutes: number): number {
+  return (minutes / 60) * hourHeight;
+}
+function pxToMinutes(px: number): number {
+  return (px / hourHeight) * 60;
+}
+function formatTime(totalMinutes: number): string {
+  const total = startHour * 60 + totalMinutes;
+  let hour = Math.floor(total / 60);
+  const minute = total % 60;
+  const period = hour < 12 ? 'AM' : 'PM';
+  hour = hour % 12 === 0 ? 12 : hour % 12;
+  const minuteStr = minute < 10 ? '0' + minute : minute.toString();
+  return `${hour}:${minuteStr} ${period}`;
+}
+function snapTime(totalMinutes: number): number {
+  if (totalMinutes === defaultEventDuration) return totalMinutes;
+  return Math.round(totalMinutes / 30) * 30;
+}
+function approxEqual(a: number, b: number, tol = 2): boolean {
+  return Math.abs(a - b) <= tol;
+}
+
+// Main Calendar component
+const Calendar: React.FC = () => {
+  // Events are stored in state
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  // State for assignment modals
+  const [professors] = useState<string[]>(["Dr. Smith", "Prof. Johnson", "Dr. Williams", "Prof. Brown"]);
+  const [classes] = useState<string[]>(["Math 101", "History 202", "Biology 303", "Chemistry 404"]);
+  const [modalProfessorOpen, setModalProfessorOpen] = useState<boolean>(false);
+  const [modalClassOpen, setModalClassOpen] = useState<boolean>(false);
+  const [currentAssignmentEventId, setCurrentAssignmentEventId] = useState<string | null>(null);
+  const [assignmentType, setAssignmentType] = useState<"professor" | "class" | null>(null);
+
+  // Refs to handle dragging/resizing
+  const currentEventRef = useRef<CalendarEvent | null>(null);
+  const dragTypeRef = useRef<"move" | "resize-top" | "resize-bottom" | null>(null);
+  const dragStartYRef = useRef<number>(0);
+  const initialTopRef = useRef<number>(0);
+  const initialHeightRef = useRef<number>(0);
+
+  // Update an event in state
+  const updateEvent = (updatedEvent: CalendarEvent) => {
+    setEvents(prev => prev.map(ev => ev.id === updatedEvent.id ? updatedEvent : ev));
+  };
+
+  // When a day column is clicked, create a new event
+  const handleDayColumnClick = (day: string, clickY: number) => {
+    let clickMinutes = pxToMinutes(clickY);
+    if (restrictedDays.includes(day) && clickMinutes < restrictionStart) {
+      alert(`Events on ${day} must be 5PM or later.`);
+      return;
+    }
+    let snappedMinutes = snapTime(clickMinutes);
+    if (restrictedDays.includes(day) && snappedMinutes < restrictionStart) {
+      snappedMinutes = restrictionStart;
+    }
+    const newEvent: CalendarEvent = {
+      id: generateUniqueId(),
+      day,
+      top: minutesToPx(snappedMinutes),
+      height: minutesToPx(defaultEventDuration),
+      isRepeat: false,
+      master: true,
+      repeatGroup: generateUniqueId(),
+      justCreated: true,
+    };
+    setEvents(prev => [...prev, newEvent]);
+    checkAndCreateRepeats(newEvent);
+  };
+
+  // Check and create repeat events based on event duration and day
+  const checkAndCreateRepeats = (event: CalendarEvent, forceRecreate: boolean = false) => {
+    const duration = Math.round(pxToMinutes(event.height));
+    let expectedRepeats: { day: string; pattern: string }[] = [];
+
+    if (event.day === "Monday") {
+      if (approxEqual(duration, 50)) {
+        expectedRepeats = [{ day: "Wednesday", pattern: "MWF" }, { day: "Friday", pattern: "MWF" }];
+      } else if (approxEqual(duration, 80)) {
+        expectedRepeats = [{ day: "Wednesday", pattern: "MWF" }];
+      }
+    } else if (event.day === "Tuesday" && approxEqual(duration, 80)) {
+      expectedRepeats = [{ day: "Thursday", pattern: "TR" }];
+    }
+    // Remove old repeats (if any) by filtering out events with the same repeat group (except the master)
+    setEvents(prev => prev.filter(ev => !(ev.repeatGroup === event.repeatGroup && ev.id !== event.id)));
+    // Create new repeats based on the expected pattern
+    expectedRepeats.forEach(({ day, pattern }) => {
+      const repeatedEvent: CalendarEvent = {
+        id: generateUniqueId(),
+        day,
+        top: event.top,
+        height: event.height,
+        isRepeat: true,
+        repeatGroup: event.repeatGroup,
+        repeatPattern: pattern,
+      };
+      setEvents(prev => [...prev, repeatedEvent]);
+    });
+  };
+
+  // Sync repeated events whenever a master event is updated
+  const syncRepeatedEvents = (masterEvent: CalendarEvent) => {
+    setEvents(prev =>
+      prev.map(ev =>
+        ev.repeatGroup === masterEvent.repeatGroup && ev.id !== masterEvent.id
+          ? { ...ev, top: masterEvent.top, height: masterEvent.height }
+          : ev
+      )
+    );
+  };
+
+  // Delete an event and all its repeats
+  const deleteEvent = (event: CalendarEvent) => {
+    if (window.confirm("Delete this event and its repeats?")) {
+      setEvents(prev => prev.filter(ev => ev.repeatGroup !== event.repeatGroup));
+    }
+  };
+
+  // Global mousemove and mouseup listeners to handle drag/resizing
+  useEffect(() => {
+    const containerHeight = (endHour - startHour) * hourHeight;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!currentEventRef.current || !dragTypeRef.current) return;
+      const currentEvent = currentEventRef.current;
+      if (dragTypeRef.current === "move") {
+        let newTop = initialTopRef.current + (e.clientY - dragStartYRef.current);
+        newTop = Math.max(0, Math.min(newTop, containerHeight - currentEvent.height));
+        currentEvent.top = newTop;
+      } else if (dragTypeRef.current === "resize-top") {
+        let newTop = initialTopRef.current + (e.clientY - dragStartYRef.current);
+        const currentBottom = initialTopRef.current + initialHeightRef.current;
+        newTop = Math.max(0, Math.min(newTop, currentBottom - minutesToPx(minDuration)));
+        currentEvent.top = newTop;
+        currentEvent.height = currentBottom - newTop;
+      } else if (dragTypeRef.current === "resize-bottom") {
+        let newHeight = initialHeightRef.current + (e.clientY - dragStartYRef.current);
+        newHeight = Math.max(minutesToPx(minDuration), Math.min(newHeight, containerHeight - currentEvent.top));
+        currentEvent.height = newHeight;
+      }
+      updateEvent(currentEvent);
+      syncRepeatedEvents(currentEvent);
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (!currentEventRef.current || !dragTypeRef.current) return;
+      let currentEvent = currentEventRef.current;
+      let snappedTop = minutesToPx(snapTime(pxToMinutes(currentEvent.top)));
+      if (restrictedDays.includes(currentEvent.day) && snappedTop < minutesToPx(restrictionStart)) {
+        snappedTop = minutesToPx(restrictionStart);
+      }
+      currentEvent.top = snappedTop;
+      if (dragTypeRef.current !== "move") {
+        currentEvent.height = minutesToPx(snapTime(pxToMinutes(currentEvent.height)));
+      }
+      updateEvent(currentEvent);
+      syncRepeatedEvents(currentEvent);
+      if (dragTypeRef.current !== "move") {
+        checkAndCreateRepeats(currentEvent, true);
+      }
+      currentEventRef.current = null;
+      dragTypeRef.current = null;
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  // MouseDown handler for an event element (for move/resize)
+  const handleEventMouseDown = (
+    e: React.MouseEvent,
+    event: CalendarEvent,
+    type: "move" | "resize-top" | "resize-bottom"
+  ) => {
+    e.stopPropagation();
+    if (event.justCreated) {
+      event.justCreated = false;
+    }
+    dragTypeRef.current = type;
+    // We take a shallow copy so that subsequent changes are applied and then saved via updateEvent
+    currentEventRef.current = { ...event };
+    dragStartYRef.current = e.clientY;
+    initialTopRef.current = event.top;
+    initialHeightRef.current = event.height;
+  };
+
+  // Render an individual event as a positioned div
+  const renderEvent = (event: CalendarEvent) => {
+    return (
+      <div
+        key={event.id}
+        className={`event ${event.isRepeat ? "repeat-event" : ""}`}
+        style={{
+          position: "absolute",
+          top: event.top,
+          height: event.height,
+          width: "90%",
+          left: "5%",
+          background: "#f0f8ff",
+          border: "1px solid #888",
+          cursor: "move",
+          userSelect: "none"
+        }}
+        onMouseDown={(e) => handleEventMouseDown(e, event, "move")}
+      >
+        {/* Only master events have full controls */}
+        {!event.isRepeat && (
+          <>
+            <div
+              className="resize-handle top"
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                handleEventMouseDown(e, event, "resize-top");
+              }}
+              style={{ height: 5, cursor: "ns-resize", background: "#ccc" }}
+            />
+          </>
+        )}
+        <div className="event-header" style={{ position: "relative" }}>
+          <div
+            className="assign-professor-icon"
+            style={{ position: "absolute", top: 0, left: 0 }}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setCurrentAssignmentEventId(event.id);
+                setAssignmentType("professor");
+                setModalProfessorOpen(true);
+              }}
+            >
+              {event.professor ? `Prof: ${event.professor}` : "Assign Professor"}
+            </button>
+          </div>
+          <div
+            className="assign-class-icon"
+            style={{ position: "absolute", top: 0, right: 0 }}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setCurrentAssignmentEventId(event.id);
+                setAssignmentType("class");
+                setModalClassOpen(true);
+              }}
+            >
+              {event.classAssigned ? `Class: ${event.classAssigned}` : "Assign Class"}
+            </button>
+          </div>
+        </div>
+        <div className="label" style={{ textAlign: "center", fontSize: "12px" }}>
+          {formatTime(pxToMinutes(event.top))} - {formatTime(pxToMinutes(event.top + event.height))}
+        </div>
+        {!event.isRepeat && (
+          <>
+            <div
+              className="resize-handle bottom"
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                handleEventMouseDown(e, event, "resize-bottom");
+              }}
+              style={{ height: 5, cursor: "ns-resize", background: "#ccc" }}
+            />
+            <div className="preset-buttons" style={{ display: "flex", justifyContent: "space-around" }}>
+              {event.day !== "Tuesday" && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    event.height = minutesToPx(50);
+                    updateEvent(event);
+                    syncRepeatedEvents(event);
+                    checkAndCreateRepeats(event, true);
+                  }}
+                >
+                  50
+                </button>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  event.height = minutesToPx(80);
+                  updateEvent(event);
+                  syncRepeatedEvents(event);
+                  checkAndCreateRepeats(event, true);
+                }}
+              >
+                80
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  event.height = minutesToPx(160);
+                  updateEvent(event);
+                  syncRepeatedEvents(event);
+                  checkAndCreateRepeats(event, true);
+                }}
+              >
+                160
+              </button>
+            </div>
+            <button
+              className="delete-button"
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteEvent(event);
+              }}
+            >
+              Delete
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // Render a single day column with hour lines and events
+  const renderDayColumn = (day: string) => {
+    const columnStyle: React.CSSProperties = {
+      position: "relative",
+      border: "1px solid #ccc",
+      flex: 1,
+      height: (endHour - startHour) * hourHeight,
+    };
+    return (
+      <div
+        key={day}
+        className="day-column"
+        onClick={(e) => {
+          const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+          handleDayColumnClick(day, e.clientY - rect.top);
+        }}
+        style={columnStyle}
+      >
+        {/* Hour lines */}
+        {Array.from({ length: endHour - startHour + 1 }, (_, i) => {
+          const y = i * hourHeight;
+          return (
+            <div
+              key={i}
+              className="hour-line"
+              style={{
+                position: "absolute",
+                top: y,
+                width: "100%",
+                height: 1,
+                background: "#ddd"
+              }}
+            />
+          );
+        })}
+        {/* Snap lines at half hour */}
+        {Array.from({ length: endHour - startHour }, (_, i) => {
+          const halfY = minutesToPx(i * 60 + 30);
+          return (
+            <div
+              key={`snap-${i}`}
+              className="snap-line"
+              style={{
+                position: "absolute",
+                top: halfY,
+                width: "100%",
+                height: 1,
+                background: "#eee"
+              }}
+            />
+          );
+        })}
+        {/* Render events for this day */}
+        {events.filter(ev => ev.day === day).map(ev => renderEvent(ev))}
+      </div>
+    );
+  };
+
+  // Render header with day names
+  const renderHeaderDays = () => {
+    return (
+      <div className="header-days" style={{ display: "flex" }}>
+        {days.map(day => (
+          <div key={day} className="day-header" style={{ flex: 1, textAlign: "center" }}>
+            {day}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Render time gutter with time labels
+  const renderTimeGutter = () => {
+    return (
+      <div className="time-gutter" style={{ position: "relative", width: 60 }}>
+        {Array.from({ length: endHour - startHour + 1 }, (_, i) => {
+          const y = i * hourHeight;
+          return (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                top: y - 7,
+                right: 5,
+                fontSize: 12
+              }}
+            >
+              {formatTime(i * 60)}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Handle assignment confirmation (for both professor and class)
+  const handleConfirmAssignment = (value: string) => {
+    if (currentAssignmentEventId) {
+      setEvents(prev =>
+        prev.map(ev => {
+          if (ev.id === currentAssignmentEventId) {
+            if (assignmentType === "professor") {
+              return { ...ev, professor: value };
+            } else if (assignmentType === "class") {
+              return { ...ev, classAssigned: value };
+            }
+          }
+          return ev;
+        })
+      );
+    }
+    setModalProfessorOpen(false);
+    setModalClassOpen(false);
+    setCurrentAssignmentEventId(null);
+    setAssignmentType(null);
+  };
+
+  // Render Professor Modal
+  const renderProfessorModal = () => {
+    const [searchTerm, setSearchTerm] = useState("");
+    const filteredProfessors = professors.filter(p =>
+      p.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    return (
+      <div className="modal" style={{ display: modalProfessorOpen ? "block" : "none" }}>
+        <div className="modal-content">
+          <h3>Select Professor</h3>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search Professor"
+          />
+          <select id="professorSelect">
+            {filteredProfessors.map(p => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              const select = document.getElementById("professorSelect") as HTMLSelectElement;
+              if (select.value) handleConfirmAssignment(select.value);
+            }}
+          >
+            Confirm
+          </button>
+          <button
+            onClick={() => {
+              setModalProfessorOpen(false);
+              setCurrentAssignmentEventId(null);
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Render Class Modal
+  const renderClassModal = () => {
+    const [searchTerm, setSearchTerm] = useState("");
+    const filteredClasses = classes.filter(c =>
+      c.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    return (
+      <div className="modal" style={{ display: modalClassOpen ? "block" : "none" }}>
+        <div className="modal-content">
+          <h3>Select Class</h3>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search Class"
+          />
+          <select id="classSelect">
+            {filteredClasses.map(c => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              const select = document.getElementById("classSelect") as HTMLSelectElement;
+              if (select.value) handleConfirmAssignment(select.value);
+            }}
+          >
+            Confirm
+          </button>
+          <button
+            onClick={() => {
+              setModalClassOpen(false);
+              setCurrentAssignmentEventId(null);
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Render an event summary table
+  const renderEventTable = () => {
+    const tableRows = events.map(ev => {
+      const startMins = Math.round(pxToMinutes(ev.top));
+      const endMins = Math.round(pxToMinutes(ev.top + ev.height));
+      const duration = endMins - startMins;
+      const dayLabel = ev.repeatPattern || ev.day;
+      return (
+        <tr key={ev.id}>
+          <td>{dayLabel}</td>
+          <td>{formatTime(startMins)}</td>
+          <td>{formatTime(endMins)}</td>
+          <td>{duration}</td>
+          <td>{ev.professor || ""}</td>
+          <td>{ev.classAssigned || ""}</td>
+        </tr>
+      );
+    });
+    return (
+      <table id="eventTable">
+        <thead>
+          <tr>
+            <th>Day</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Duration</th>
+            <th>Professor</th>
+            <th>Class</th>
+          </tr>
+        </thead>
+        <tbody>{tableRows}</tbody>
+      </table>
+    );
+  };
+
+  return (
+    <div className="calendar-container">
+      {renderHeaderDays()}
+      <div style={{ display: "flex" }}>
+        {renderTimeGutter()}
+        <div className="day-columns-container" style={{ display: "flex", flex: 1 }}>
+          {days.map(day => renderDayColumn(day))}
+        </div>
+      </div>
+      {renderEventTable()}
+      {modalProfessorOpen && renderProfessorModal()}
+      {modalClassOpen && renderClassModal()}
+    </div>
+  );
+};
+
+export default Calendar;

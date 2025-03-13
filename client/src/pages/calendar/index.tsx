@@ -6,7 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Trash2, UserCircle2, BookOpen } from "lucide-react";
 import "./Calendar.css";
 
-// Types and Constants
 interface CalendarEvent {
   id: string;
   day: string;
@@ -18,6 +17,7 @@ interface CalendarEvent {
   professor?: Professor;
   classAssigned?: Class;
   room?: Room;
+  master?: boolean;
   justCreated?: boolean;
 }
 
@@ -29,44 +29,53 @@ interface DragState {
   initialHeight: number;
 }
 
-const startHour = 8;
-const endHour = 18;
-const hourHeight = 100;
-const defaultEventDuration = 80;
-const minDuration = 30;
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 const restrictedDays = ["Wednesday", "Thursday", "Friday"] as const;
+const startHour = 8, endHour = 18, hourHeight = 100;
+const defaultEventDuration = 80, minDuration = 30;
 const restrictionStart = 9 * 60; // 9 AM in minutes
 
-// Helper functions
-const minutesToPx = (minutes: number): number => (minutes / 60) * hourHeight;
-const pxToMinutes = (px: number): number => (px / hourHeight) * 60;
-const approxEqual = (a: number, b: number, tol = 2): boolean => Math.abs(a - b) <= tol;
-const generateUniqueId = () => Date.now().toString() + Math.floor(Math.random() * 1000).toString();
+function generateUniqueId(): string {
+  return Date.now().toString() + Math.floor(Math.random() * 1000).toString();
+}
 
-const formatTime = (totalMinutes: number): string => {
+function minutesToPx(minutes: number): number {
+  return (minutes / 60) * hourHeight;
+}
+
+function pxToMinutes(px: number): number {
+  return (px / hourHeight) * 60;
+}
+
+function formatTime(totalMinutes: number): string {
   const total = startHour * 60 + totalMinutes;
-  const hour = Math.floor(total / 60);
+  let hour = Math.floor(total / 60);
   const minute = total % 60;
-  const period = hour < 12 ? "AM" : "PM";
-  const displayHour = hour % 12 || 12;
-  const minuteStr = minute.toString().padStart(2, "0");
-  return `${displayHour}:${minuteStr} ${period}`;
-};
+  const period = hour < 12 ? 'AM' : 'PM';
+  hour = hour % 12 === 0 ? 12 : hour % 12;
+  const minuteStr = minute < 10 ? '0' + minute : minute.toString();
+  return `${hour}:${minuteStr} ${period}`;
+}
 
-const snapTime = (totalMinutes: number): number => {
+function snapTime(totalMinutes: number): number {
   if (totalMinutes === defaultEventDuration) return totalMinutes;
   return Math.round(totalMinutes / 30) * 30;
-};
+}
 
-// Main Calendar Component
+function approxEqual(a: number, b: number, tol = 2): boolean {
+  return Math.abs(a - b) <= tol;
+}
+
 const Calendar: React.FC = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [dragState, setDragState] = useState<DragState | null>(null);
-  const calendarGridRef = useRef<HTMLDivElement>(null);
+  const currentEventRef = useRef<CalendarEvent | null>(null);
+  const dragTypeRef = useRef<"move" | "resize-top" | "resize-bottom" | null>(null);
+  const dragStartYRef = useRef<number>(0);
+  const initialTopRef = useRef<number>(0);
+  const initialHeightRef = useRef<number>(0);
   const { toast } = useToast();
 
-  // Fetch necessary data
+  // Fetch data
   const { data: professors } = useQuery<Professor[]>({
     queryKey: ["/api/professors"],
   });
@@ -79,103 +88,121 @@ const Calendar: React.FC = () => {
     queryKey: ["/api/rooms"],
   });
 
-  // Event mutation
-  const createEventMutation = useMutation({
-    mutationFn: async (event: Omit<ScheduleEvent, "id">) => {
-      const response = await fetch("/api/schedule-events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(event),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to create event");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedule-events"] });
-      toast({ title: "Event created successfully" });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to create event",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const syncRepeatedEvents = (masterEvent: CalendarEvent) => {
     if (!masterEvent.repeatGroup) return;
-
-    setEvents(prevEvents =>
-      prevEvents.map(ev => {
-        if (ev.isRepeat && ev.repeatGroup === masterEvent.repeatGroup) {
-          return {
-            ...ev,
-            top: masterEvent.top,
-            height: masterEvent.height,
-            professor: masterEvent.professor,
-            classAssigned: masterEvent.classAssigned,
-            room: masterEvent.room,
-          };
-        }
-        return ev;
-      })
-    );
+    setEvents(prev => prev.map(ev => {
+      if (ev.repeatGroup === masterEvent.repeatGroup && ev.id !== masterEvent.id) {
+        return {
+          ...ev,
+          top: masterEvent.top,
+          height: masterEvent.height,
+          professor: masterEvent.professor,
+          classAssigned: masterEvent.classAssigned,
+          room: masterEvent.room,
+        };
+      }
+      return ev;
+    }));
   };
 
-  const checkAndCreateRepeats = (masterEvent: CalendarEvent, forceRecreate = false) => {
-    const groupId = masterEvent.repeatGroup;
-    const duration = Math.round(pxToMinutes(masterEvent.height));
+  const checkAndCreateRepeats = (event: CalendarEvent, forceRecreate: boolean = false) => {
+    const duration = Math.round(pxToMinutes(event.height));
     let expectedRepeats: { day: string; pattern: string }[] = [];
 
-    if (masterEvent.day === "Monday") {
+    if (event.day === "Monday") {
       if (approxEqual(duration, 50)) {
         expectedRepeats = [
           { day: "Wednesday", pattern: "MWF" },
-          { day: "Friday", pattern: "MWF" },
+          { day: "Friday", pattern: "MWF" }
         ];
       } else if (approxEqual(duration, 80)) {
         expectedRepeats = [{ day: "Wednesday", pattern: "MWF" }];
       }
-    } else if (masterEvent.day === "Tuesday" && approxEqual(duration, 80)) {
+    } else if (event.day === "Tuesday" && approxEqual(duration, 80)) {
       expectedRepeats = [{ day: "Thursday", pattern: "TR" }];
     }
 
-    const currentRepeats = events.filter(ev => ev.isRepeat && ev.repeatGroup === groupId);
-    const currentRepeatDays = currentRepeats.map(ev => ev.day);
-
-    if (!forceRecreate &&
-        expectedRepeats.length === currentRepeats.length &&
-        expectedRepeats.every(exp => currentRepeatDays.includes(exp.day))) {
-      syncRepeatedEvents(masterEvent);
-      return;
-    }
-
     // Remove old repeats
-    setEvents(prevEvents =>
-      prevEvents.filter(ev => !(ev.isRepeat && ev.repeatGroup === groupId))
-    );
+    setEvents(prev => prev.filter(ev => !(ev.repeatGroup === event.repeatGroup && ev.id !== event.id)));
 
     // Create new repeats
     expectedRepeats.forEach(({ day, pattern }) => {
-      const newRepeat: CalendarEvent = {
+      const repeatedEvent: CalendarEvent = {
         id: generateUniqueId(),
         day,
-        top: masterEvent.top,
-        height: masterEvent.height,
+        top: event.top,
+        height: event.height,
         isRepeat: true,
-        repeatGroup: groupId,
+        repeatGroup: event.repeatGroup,
         repeatPattern: pattern,
-        professor: masterEvent.professor,
-        classAssigned: masterEvent.classAssigned,
-        room: masterEvent.room,
+        professor: event.professor,
+        classAssigned: event.classAssigned,
+        room: event.room
       };
-      setEvents(prev => [...prev, newRepeat]);
+      setEvents(prev => [...prev, repeatedEvent]);
     });
   };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!currentEventRef.current || !dragTypeRef.current) return;
+
+      const containerHeight = (endHour - startHour) * hourHeight;
+      const currentEvent = currentEventRef.current;
+
+      if (dragTypeRef.current === "move") {
+        let newTop = initialTopRef.current + (e.clientY - dragStartYRef.current);
+        newTop = Math.max(0, Math.min(newTop, containerHeight - currentEvent.height));
+        currentEvent.top = newTop;
+      } else if (dragTypeRef.current === "resize-top") {
+        let newTop = initialTopRef.current + (e.clientY - dragStartYRef.current);
+        const currentBottom = initialTopRef.current + initialHeightRef.current;
+        newTop = Math.max(0, Math.min(newTop, currentBottom - minutesToPx(minDuration)));
+        currentEvent.top = newTop;
+        currentEvent.height = currentBottom - newTop;
+      } else if (dragTypeRef.current === "resize-bottom") {
+        let newHeight = initialHeightRef.current + (e.clientY - dragStartYRef.current);
+        newHeight = Math.max(minutesToPx(minDuration), Math.min(newHeight, containerHeight - currentEvent.top));
+        currentEvent.height = newHeight;
+      }
+
+      setEvents(prev => prev.map(ev => ev.id === currentEvent.id ? { ...currentEvent } : ev));
+      syncRepeatedEvents(currentEvent);
+    };
+
+    const handleMouseUp = () => {
+      if (!currentEventRef.current || !dragTypeRef.current) return;
+
+      let currentEvent = currentEventRef.current;
+      let snappedTop = minutesToPx(snapTime(pxToMinutes(currentEvent.top)));
+
+      if (restrictedDays.includes(currentEvent.day as typeof restrictedDays[number]) && 
+          snappedTop < minutesToPx(restrictionStart)) {
+        snappedTop = minutesToPx(restrictionStart);
+      }
+
+      currentEvent.top = snappedTop;
+
+      if (dragTypeRef.current !== "move") {
+        currentEvent.height = minutesToPx(snapTime(pxToMinutes(currentEvent.height)));
+        checkAndCreateRepeats(currentEvent, true);
+      }
+
+      setEvents(prev => prev.map(ev => ev.id === currentEvent.id ? { ...currentEvent } : ev));
+      syncRepeatedEvents(currentEvent);
+
+      currentEventRef.current = null;
+      dragTypeRef.current = null;
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
 
   const handleDayClick = (e: React.MouseEvent<HTMLDivElement>, day: string) => {
     if ((e.target as HTMLElement).closest(".event")) return;
@@ -187,8 +214,7 @@ const Calendar: React.FC = () => {
     if (restrictedDays.includes(day as typeof restrictedDays[number]) && clickMinutes < restrictionStart) {
       toast({
         title: "Invalid time slot",
-        description: `Events on ${day} must be scheduled after ${formatTime(restrictionStart)}`,
-        variant: "destructive",
+        description: `Events on ${day} must be after ${formatTime(restrictionStart)}`
       });
       return;
     }
@@ -198,254 +224,43 @@ const Calendar: React.FC = () => {
       snappedMinutes = restrictionStart;
     }
 
-    const snappedY = minutesToPx(snappedMinutes);
     const newEvent: CalendarEvent = {
       id: generateUniqueId(),
       day,
-      top: snappedY,
+      top: minutesToPx(snappedMinutes),
       height: minutesToPx(defaultEventDuration),
+      master: true,
       repeatGroup: generateUniqueId(),
-      justCreated: true,
+      justCreated: true
     };
 
     setEvents(prev => [...prev, newEvent]);
     checkAndCreateRepeats(newEvent);
   };
 
-  const handleEventMouseDown = (e: React.MouseEvent, event: CalendarEvent, dragType: DragState["dragType"]) => {
-    e.stopPropagation();
-    if (event.justCreated) {
-      setEvents(prevEvents =>
-        prevEvents.map(ev => (ev.id === event.id ? { ...ev, justCreated: false } : ev))
-      );
-    }
-    setDragState({
-      eventId: event.id,
-      dragType,
-      startY: e.clientY,
-      initialTop: event.top,
-      initialHeight: event.height,
-    });
-  };
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!dragState) return;
-
-      setEvents(prevEvents =>
-        prevEvents.map(ev => {
-          if (ev.id !== dragState.eventId) return ev;
-
-          const parentHeight = calendarGridRef.current?.clientHeight || 0;
-
-          if (dragState.dragType === "move") {
-            let newTop = dragState.initialTop + (e.clientY - dragState.startY);
-            newTop = Math.max(0, Math.min(newTop, parentHeight - ev.height));
-            return { ...ev, top: newTop };
-          } else if (dragState.dragType === "resize-top") {
-            let newTop = dragState.initialTop + (e.clientY - dragState.startY);
-            let currentBottom = dragState.initialTop + dragState.initialHeight;
-            newTop = Math.max(0, Math.min(newTop, currentBottom - minutesToPx(minDuration)));
-            return { ...ev, top: newTop, height: currentBottom - newTop };
-          } else if (dragState.dragType === "resize-bottom") {
-            let newHeight = dragState.initialHeight + (e.clientY - dragState.startY);
-            newHeight = Math.max(
-              minutesToPx(minDuration),
-              Math.min(newHeight, parentHeight - ev.top)
-            );
-            return { ...ev, height: newHeight };
-          }
-          return ev;
-        })
-      );
-    };
-
-    const handleMouseUp = () => {
-      if (!dragState) return;
-
-      setEvents(prevEvents =>
-        prevEvents.map(ev => {
-          if (ev.id !== dragState.eventId) return ev;
-
-          let snappedTop = minutesToPx(snapTime(pxToMinutes(ev.top)));
-          if (restrictedDays.includes(ev.day as typeof restrictedDays[number]) &&
-              snappedTop < minutesToPx(restrictionStart)) {
-            snappedTop = minutesToPx(restrictionStart);
-          }
-
-          const updatedEvent = { ...ev, top: snappedTop };
-
-          if (dragState.dragType !== "move") {
-            const snappedHeight = minutesToPx(snapTime(pxToMinutes(ev.height)));
-            updatedEvent.height = snappedHeight;
-            checkAndCreateRepeats(updatedEvent, true);
-          }
-
-          syncRepeatedEvents(updatedEvent);
-          return updatedEvent;
-        })
-      );
-
-      setDragState(null);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [dragState]);
-
-  const renderEventContent = (ev: CalendarEvent) => (
-    <>
-      {/* Controls - Top */}
-      <div className="event-controls top">
-        <button
-          className="control-button"
-          onClick={(e) => {
-            e.stopPropagation();
-            const newProf = prompt("Assign Professor", ev.professor?.name || "");
-            if (newProf !== null) {
-              setEvents(prev =>
-                prev.map(event =>
-                  event.id === ev.id ? { ...event, professor: { name: newProf } } : event
-                )
-              );
-              syncRepeatedEvents({ ...ev, professor: { name: newProf } });
-            }
-          }}
-        >
-          <UserCircle2 className="h-4 w-4" />
-        </button>
-        <button
-          className="control-button"
-          onClick={(e) => {
-            e.stopPropagation();
-            const newClass = prompt("Assign Class", ev.classAssigned?.name || "");
-            if (newClass !== null) {
-              setEvents(prev =>
-                prev.map(event =>
-                  event.id === ev.id ? { ...event, classAssigned: { name: newClass } } : event
-                )
-              );
-              syncRepeatedEvents({ ...ev, classAssigned: { name: newClass } });
-            }
-          }}
-        >
-          <BookOpen className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Event Time */}
-      <div className="event-time">
-        {formatTime(Math.round(pxToMinutes(ev.top)))} -{" "}
-        {formatTime(Math.round(pxToMinutes(ev.top + ev.height)))}
-      </div>
-
-      {/* Controls - Bottom */}
-      <div className="event-controls bottom">
-        <button
-          className="control-button delete-button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (window.confirm("Delete this event and its repeats?")) {
-              setEvents(prev =>
-                prev.filter(
-                  event => event.id !== ev.id && event.repeatGroup !== ev.repeatGroup
-                )
-              );
-            }
-          }}
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-        <div className="flex gap-1">
-          {!ev.isRepeat && ev.day !== "Tuesday" && (
-            <button
-              className="time-button"
-              onClick={(e) => {
-                e.stopPropagation();
-                ev.height = minutesToPx(50);
-                syncRepeatedEvents(ev);
-                checkAndCreateRepeats(ev, true);
-              }}
-            >
-              50
-            </button>
-          )}
-          <button
-            className="time-button"
-            onClick={(e) => {
-              e.stopPropagation();
-              ev.height = minutesToPx(80);
-              syncRepeatedEvents(ev);
-              checkAndCreateRepeats(ev, true);
-            }}
-          >
-            80
-          </button>
-          <button
-            className="time-button"
-            onClick={(e) => {
-              e.stopPropagation();
-              ev.height = minutesToPx(160);
-              syncRepeatedEvents(ev);
-              checkAndCreateRepeats(ev, true);
-            }}
-          >
-            160
-          </button>
-        </div>
-      </div>
-
-      {/* Event Details */}
-      <div className="event-details">
-        {ev.professor && (
-          <div>{ev.professor.name}</div>
-        )}
-        {ev.classAssigned && (
-          <div>
-            {ev.classAssigned.prefix} {ev.classAssigned.code}
-          </div>
-        )}
-        {ev.room && (
-          <div>{ev.room.name}</div>
-        )}
-        {ev.repeatPattern && (
-          <div>
-            Pattern: {ev.repeatPattern}
-          </div>
-        )}
-      </div>
-    </>
-  );
-
   return (
     <div className="calendar-container">
-      <h1 className="text-2xl font-bold mb-4">Faculty Schedule</h1>
-
-      {/* Day Headers */}
-      <div className="flex">
-        <div className="w-16" />
+      <div className="header-days">
         {days.map(day => (
-          <div key={day} className="flex-1 text-center font-bold py-2">
+          <div key={day} className="day-header">
             {day}
           </div>
         ))}
       </div>
 
-      <div className="flex flex-1">
-        {/* Time Gutter */}
+      <div style={{ display: "flex" }}>
         <div className="time-gutter">
           {Array.from({ length: endHour - startHour + 1 }, (_, i) => {
             const y = i * hourHeight;
             return (
               <div
                 key={i}
-                className="time-label"
-                style={{ top: y }}
+                style={{
+                  position: "absolute",
+                  top: y - 7,
+                  right: 5,
+                  fontSize: 12
+                }}
               >
                 {formatTime(i * 60)}
               </div>
@@ -453,33 +268,30 @@ const Calendar: React.FC = () => {
           })}
         </div>
 
-        {/* Calendar Grid */}
-        <div
-          ref={calendarGridRef}
-          className="flex-1 flex border border-gray-200"
-        >
+        <div className="day-columns-container">
           {days.map(day => (
             <div
               key={day}
               className="day-column"
               onClick={(e) => handleDayClick(e, day)}
+              data-day={day}
             >
               {/* Hour lines */}
               {Array.from({ length: endHour - startHour + 1 }, (_, i) => {
                 const y = i * hourHeight;
                 return (
-                  <React.Fragment key={i}>
-                    <div
-                      className="hour-line"
-                      style={{ top: y }}
-                    />
-                    {i < endHour - startHour && (
-                      <div
-                        className="half-hour-line"
-                        style={{ top: y + hourHeight / 2 }}
-                      />
-                    )}
-                  </React.Fragment>
+                  <div key={i}>
+                    <div className="hour-line" style={{ top: y }} />
+                    {(() => {
+                      const halfY = minutesToPx(i * 60 + 30);
+                      if (halfY <= hourHeight * (endHour - startHour)) {
+                        return (
+                          <div className="snap-line" style={{ top: halfY }} />
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                 );
               })}
 
@@ -489,31 +301,150 @@ const Calendar: React.FC = () => {
                 .map(ev => (
                   <div
                     key={ev.id}
-                    className={`event ${dragState?.eventId === ev.id ? 'dragging' : ''} ${ev.isRepeat ? 'repeat' : ''}`}
+                    className={`event ${ev.isRepeat ? "repeat-event" : ""}`}
                     style={{
                       top: ev.top,
                       height: ev.height,
+                      left: "5px",
+                      right: "5px",
+                      position: "absolute",
+                      border: "1px solid #999",
+                      boxSizing: "border-box",
                     }}
                     onMouseDown={(e) => {
+                      if (ev.justCreated) {
+                        setEvents(prev => prev.map(event => 
+                          event.id === ev.id ? { ...event, justCreated: false } : event
+                        ));
+                      }
+
                       const target = e.target as HTMLElement;
-                      if (target.closest('button')) return;
-                      if (target.classList.contains('resize-handle')) return;
-                      handleEventMouseDown(e, ev, "move");
+                      if (target.classList.contains("assign-professor") || 
+                          target.classList.contains("assign-class") ||
+                          target.classList.contains("preset-button") || 
+                          target.classList.contains("delete-button")) return;
+
+                      dragTypeRef.current = target.classList.contains("resize-handle") ? 
+                        (target.classList.contains("top") ? "resize-top" : "resize-bottom") : 
+                        "move";
+
+                      currentEventRef.current = ev;
+                      dragStartYRef.current = e.clientY;
+                      initialTopRef.current = ev.top;
+                      initialHeightRef.current = ev.height;
+                      e.stopPropagation();
                     }}
                   >
                     {!ev.isRepeat && (
                       <>
-                        <div
-                          className="resize-handle top"
-                          onMouseDown={(e) => handleEventMouseDown(e, ev, "resize-top")}
-                        />
-                        <div
-                          className="resize-handle bottom"
-                          onMouseDown={(e) => handleEventMouseDown(e, ev, "resize-bottom")}
-                        />
+                        <div className="resize-handle top" />
+                        <div className="resize-handle bottom" />
                       </>
                     )}
-                    {renderEventContent(ev)}
+
+                    <div className="event-header">
+                      <button 
+                        className="assign-professor"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const newProf = prompt("Assign Professor", ev.professor?.name || "");
+                          if (newProf) {
+                            setEvents(prev => prev.map(event => 
+                              event.id === ev.id ? { ...event, professor: { name: newProf } } : event
+                            ));
+                            syncRepeatedEvents({ ...ev, professor: { name: newProf } });
+                          }
+                        }}
+                      >
+                        <UserCircle2 className="h-4 w-4" />
+                      </button>
+
+                      <button 
+                        className="assign-class"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const newClass = prompt("Assign Class", ev.classAssigned?.name || "");
+                          if (newClass) {
+                            setEvents(prev => prev.map(event => 
+                              event.id === ev.id ? { ...event, classAssigned: { name: newClass } } : event
+                            ));
+                            syncRepeatedEvents({ ...ev, classAssigned: { name: newClass } });
+                          }
+                        }}
+                      >
+                        <BookOpen className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="label">
+                      {formatTime(Math.round(pxToMinutes(ev.top)))} -{" "}
+                      {formatTime(Math.round(pxToMinutes(ev.top + ev.height)))}
+                    </div>
+
+                    {!ev.isRepeat && (
+                      <div className="event-controls">
+                        <button
+                          className="delete-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm("Delete this event and its repeats?")) {
+                              setEvents(prev => prev.filter(event => 
+                                event.id !== ev.id && event.repeatGroup !== ev.repeatGroup
+                              ));
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+
+                        <div className="preset-buttons">
+                          {ev.day !== "Tuesday" && (
+                            <button
+                              className="preset-button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const updatedEvent = { ...ev, height: minutesToPx(50) };
+                                setEvents(prev => prev.map(event => 
+                                  event.id === ev.id ? updatedEvent : event
+                                ));
+                                syncRepeatedEvents(updatedEvent);
+                                checkAndCreateRepeats(updatedEvent, true);
+                              }}
+                            >
+                              50
+                            </button>
+                          )}
+                          <button
+                            className="preset-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const updatedEvent = { ...ev, height: minutesToPx(80) };
+                              setEvents(prev => prev.map(event => 
+                                event.id === ev.id ? updatedEvent : event
+                              ));
+                              syncRepeatedEvents(updatedEvent);
+                              checkAndCreateRepeats(updatedEvent, true);
+                            }}
+                          >
+                            80
+                          </button>
+                          <button
+                            className="preset-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const updatedEvent = { ...ev, height: minutesToPx(160) };
+                              setEvents(prev => prev.map(event => 
+                                event.id === ev.id ? updatedEvent : event
+                              ));
+                              syncRepeatedEvents(updatedEvent);
+                              checkAndCreateRepeats(updatedEvent, true);
+                            }}
+                          >
+                            160
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
             </div>

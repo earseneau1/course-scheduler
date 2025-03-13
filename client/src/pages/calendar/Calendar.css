@@ -1,25 +1,237 @@
 /* Calendar Layout */
 .calendar-container {
-  @apply flex flex-col w-full bg-white rounded-lg shadow-sm;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   height: calc(100vh - 8rem);
 }
 
+.header-days {
+  display: flex;
+  width: 100%;
+  padding-left: 60px;
+}
+
+.day-header {
+  flex: 1;
+  text-align: center;
+  line-height: 40px;
+  color: #1f2937;
+  font-weight: 500;
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  transition: background 0.2s;
+}
+
+.day-header:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.time-gutter {
+  width: 60px;
+  position: relative;
+  border-right: 1px solid #e0e4e8;
+  background: #fafafa;
+}
+
+.day-columns-container {
+  display: flex;
+  flex: 1;
+  height: 1000px;
+}
+
+.day-column {
+  flex: 1;
+  position: relative;
+  border-right: 1px solid #e0e4e8;
+}
+
+.day-column:last-child {
+  border-right: none;
+}
+
+/* Event Styling */
+.event {
+  position: absolute;
+  cursor: move;
+  user-select: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.9), rgba(41, 128, 185, 0.7));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  z-index: 3;
+}
+
+.event:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.repeat-event {
+  opacity: 0.7;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.6), rgba(41, 128, 185, 0.4));
+}
+
+/* Event Header */
+.event-header {
+  position: relative;
+  height: 24px;
+}
+
+.assign-professor {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.assign-class {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+/* Event Content */
+.label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+/* Event Controls */
+.event-controls {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.delete-button {
+  padding: 4px 8px;
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.delete-button:hover {
+  background: #c0392b;
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.preset-button {
+  font-size: 12px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #2c3e50;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.preset-button:hover {
+  background: #fff;
+  transform: scale(1.05);
+}
+
+/* Resize Handles */
+.resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: ns-resize;
+  z-index: 4;
+  transition: background 0.2s;
+}
+
+.resize-handle:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.resize-handle.top {
+  top: -3px;
+  border-radius: 6px 6px 0 0;
+}
+
+.resize-handle.bottom {
+  bottom: -3px;
+  border-radius: 0 0 6px 6px;
+}
+
+/* Grid Lines */
+.hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid #d1d5db;
+  z-index: 1;
+}
+
+.snap-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #e5e7eb;
+  z-index: 0;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.snap-line.glow {
+  background: #3498db;
+  box-shadow: 0 0 5px #3498db;
+}
+
 .container {
+  /*This style from original is kept as it's not conflicting*/
   @apply bg-white rounded-lg shadow-sm;
 }
 
 .time-gutter {
+  /*This style from original is kept as it's not conflicting*/
   @apply w-16 border-r border-gray-200 bg-gray-50;
 }
 
-/* Calendar Grid */
 .day-column {
+  /*This style from original is kept as it's not conflicting*/
   @apply relative border-r border-gray-100 last:border-r-0 flex-1;
 }
 
 
-/* Event Styling */
 .calendar-event {
+  /*This style from original is kept as it's not conflicting*/
   position: absolute;
   left: 0.25rem;
   right: 0.25rem;
@@ -29,6 +241,7 @@
 }
 
 .event {
+  /*This style from original is kept as it's not conflicting*/
   @apply absolute left-1 right-1 rounded shadow-sm;
   user-select: none;
   min-height: 80px;
@@ -38,11 +251,13 @@
 }
 
 .event:not(.dragging):hover {
+  /*This style from original is kept as it's not conflicting*/
   transform: translateY(-1px);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .event.dragging {
+  /*This style from original is kept as it's not conflicting*/
   cursor: grabbing !important;
   transform: scale(0.98);
   opacity: 0.9;
@@ -51,17 +266,19 @@
 }
 
 .event.repeat {
+  /*This style from original is kept as it's not conflicting*/
   background-color: rgb(187 247 208);
   opacity: 0.9;
   pointer-events: none;
 }
 
-/* Event Content */
 .event-time {
+  /*This style from original is kept as it's not conflicting*/
   @apply absolute inset-0 flex items-center justify-center text-xs font-medium;
 }
 
 .event-content {
+  /*This style from original is kept as it's not conflicting*/
   @apply relative h-full;
   padding: 0.5rem;
   font-size: 0.75rem;
@@ -69,86 +286,91 @@
 }
 
 .event-details {
+  /*This style from original is kept as it's not conflicting*/
   @apply absolute top-8 left-1 right-1 text-xs space-y-0.5 text-gray-600;
 }
 
-/* Event Controls */
 .event-controls {
+  /*This style from original is kept as it's not conflicting*/
   @apply absolute inset-x-1;
 }
 
 .event-controls.top {
+  /*This style from original is kept as it's not conflicting*/
   @apply top-1 flex justify-between;
 }
 
 .event-controls.bottom {
+  /*This style from original is kept as it's not conflicting*/
   @apply bottom-1 flex justify-between;
 }
 
-/* Buttons */
 .control-button {
+  /*This style from original is kept as it's not conflicting*/
   @apply h-6 w-6 rounded-full bg-white/90 hover:bg-white shadow-sm 
          flex items-center justify-center transition-colors;
 }
 
 .time-button {
+  /*This style from original is kept as it's not conflicting*/
   @apply px-2 py-1 text-xs bg-white/90 hover:bg-white rounded
          shadow-sm transition-colors;
 }
 
 .delete-button {
+  /*This style from original is kept as it's not conflicting*/
   @apply text-red-600 hover:text-red-700;
 }
 
-/* Resize Handles */
 .resize-handle {
+  /*This style from original is kept as it's not conflicting*/
   @apply absolute left-0 right-0 h-1.5 bg-white/60 hover:bg-white/80 
          transition-colors cursor-ns-resize z-20;
 }
 
 .resize-handle.top {
+  /*This style from original is kept as it's not conflicting*/
   @apply -top-px rounded-t-md;
 }
 
 .resize-handle.bottom {
+  /*This style from original is kept as it's not conflicting*/
   @apply -bottom-px rounded-b-md;
 }
 
-/* Grid Lines */
 .hour-line {
+  /*This style from original is kept as it's not conflicting*/
   @apply absolute w-full h-px bg-gray-200;
 }
 
 .half-hour-line {
+  /*This style from original is kept as it's not conflicting*/
   @apply absolute w-full h-px bg-gray-100;
 }
 
-/* Time Labels */
 .time-label {
+  /*This style from original is kept as it's not conflicting*/
   @apply absolute -translate-y-1/2 right-2 text-xs text-gray-500;
 }
 
-/* Button Hover Effects */
 .event button {
+  /*This style from original is kept as it's not conflicting*/
   @apply opacity-80 hover:opacity-100 transition-opacity;
 }
 
-/* Time Display */
 .time-display {
+  /*This style from original is kept as it's not conflicting*/
   @apply font-medium text-gray-700;
 }
 
-.day-column:last-child {
-  border-right: none;
-}
-
-/* Time Labels */
 .event-time {
+  /*This style from original is kept as it's not conflicting*/
   font-weight: 600;
   color: #1f2937;
 }
 
 .event-details {
+  /*This style from original is kept as it's not conflicting*/
   margin-top: 0.25rem;
   color: #4b5563;
 }
