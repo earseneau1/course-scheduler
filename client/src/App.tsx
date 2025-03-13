@@ -7,12 +7,13 @@ import { ProtectedRoute } from "@/lib/protected-route";
 import NotFound from "@/pages/not-found";
 import Calendar from "@/pages/calendar";
 import AuthPage from "@/pages/auth";
+import DashboardPage from "@/pages/dashboard";
 
 function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
-      <ProtectedRoute path="/" component={() => <div>Dashboard (Coming Soon)</div>} />
+      <ProtectedRoute path="/" component={DashboardPage} />
       <ProtectedRoute path="/calendar" component={Calendar} />
       <Route component={NotFound} />
     </Switch>
