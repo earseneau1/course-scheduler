@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { type ScheduleEvent } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { minutesToPx, pxToMinutes, formatTime, snapTime } from "@/lib/time";
+import { minutesToPx, pxToMinutes, snapTime } from "@/lib/time";
 import { AssignProfessorDialog } from "@/components/dialogs/AssignProfessorDialog";
 import { AssignClassDialog } from "@/components/dialogs/AssignClassDialog";
 import { Trash2, GripVertical, UserPlus, BookOpen } from "lucide-react";
@@ -26,7 +26,9 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
   const initialHeight = useRef(0);
 
   const handleMouseDown = (e: React.MouseEvent, type: "move" | "resize-top" | "resize-bottom") => {
+    e.preventDefault();
     e.stopPropagation();
+
     startY.current = e.clientY;
     initialTop.current = event.startTime;
     initialHeight.current = event.duration;
@@ -39,6 +41,7 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
     setIsDragging(true);
 
     const handleMouseMove = (e: MouseEvent) => {
+      e.preventDefault();
       const deltaY = e.clientY - startY.current;
       const deltaMins = pxToMinutes(deltaY);
 
@@ -85,6 +88,7 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
           top: minutesToPx(event.startTime),
           height: minutesToPx(event.duration),
         }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Resize handles */}
         <div
@@ -97,53 +101,53 @@ export function EventBlock({ event, onUpdate, onDelete, setIsDragging }: EventBl
         />
 
         {/* Event content */}
-        <div className="p-2">
+        <div className="p-2 relative">
           {/* Top row with assign buttons */}
           <div className="flex justify-between items-center mb-2">
             <Button
               variant="ghost"
-              size="sm"
-              className="flex items-center gap-1"
-              onClick={() => setShowProfessorDialog(true)}
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowProfessorDialog(true);
+              }}
             >
               <UserPlus className="h-4 w-4" />
-              <span className="text-xs">
-                {event.professorId ? "Prof. Assigned" : "Assign Prof"}
-              </span>
             </Button>
 
             <Button
               variant="ghost"
-              size="sm"
-              className="flex items-center gap-1"
-              onClick={() => setShowClassDialog(true)}
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowClassDialog(true);
+              }}
             >
               <BookOpen className="h-4 w-4" />
-              <span className="text-xs">
-                {event.classId ? "Class Assigned" : "Assign Class"}
-              </span>
             </Button>
           </div>
 
-          {/* Middle section with drag handle and time */}
+          {/* Middle section with drag handle */}
           <div 
-            className="flex items-center justify-center py-2"
+            className="flex items-center justify-center py-1"
             onMouseDown={(e) => handleMouseDown(e, "move")}
           >
             <GripVertical className="h-4 w-4 text-gray-400" />
-            <span className="ml-2 text-sm">
-              {formatTime(event.startTime)} - {formatTime(event.startTime + event.duration)}
-            </span>
           </div>
 
           {/* Bottom row with delete button */}
           {!event.repeatPattern && (
-            <div className="flex justify-center mt-2">
+            <div className="flex justify-center mt-1">
               <Button
                 variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive/90"
-                onClick={() => onDelete(event.id)}
+                size="icon"
+                className="h-6 w-6 text-destructive hover:text-destructive/90"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(event.id);
+                }}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
