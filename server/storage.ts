@@ -123,13 +123,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteClass(id: number): Promise<void> {
-    const result = await db
-      .delete(classes)
-      .where(eq(classes.id, id))
-      .returning();
+    try {
+      // First, delete any associated schedule events
+      await db
+        .delete(scheduleEvents)
+        .where(eq(scheduleEvents.classId, id));
 
-    if (!result.length) {
-      throw new Error(`Class with id ${id} not found`);
+      // Then delete the class
+      const result = await db
+        .delete(classes)
+        .where(eq(classes.id, id))
+        .returning();
+
+      if (!result.length) {
+        throw new Error(`Class with id ${id} not found`);
+      }
+    } catch (error) {
+      console.error('Error in deleteClass:', error);
+      throw new Error(
+        error instanceof Error 
+          ? error.message 
+          : 'Failed to delete class'
+      );
     }
   }
 

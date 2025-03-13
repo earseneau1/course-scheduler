@@ -18,7 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Professor, Class, Room } from "@shared/schema";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -83,7 +83,7 @@ export default function AdminPage() {
       setIsCreatingProfessor(false);
       toast({ title: "Professor created successfully" });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Failed to create professor",
         variant: "destructive",
@@ -107,7 +107,7 @@ export default function AdminPage() {
       setEditingProfessor(null);
       toast({ title: "Professor updated successfully" });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Failed to update professor",
         variant: "destructive",
@@ -121,22 +121,20 @@ export default function AdminPage() {
       const response = await fetch(`/api/professors/${id}`, {
         method: "DELETE",
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to delete professor");
-      }
+      if (!response.ok) throw new Error("Failed to delete professor");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/professors"] });
       setDeletingItem(null);
       toast({ title: "Professor deleted successfully" });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Failed to delete professor",
         variant: "destructive",
         description: error.message,
       });
+      setDeletingItem(null);
     },
   });
 
@@ -156,7 +154,7 @@ export default function AdminPage() {
       setIsCreatingClass(false);
       toast({ title: "Class created successfully" });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Failed to create class",
         variant: "destructive",
@@ -180,7 +178,7 @@ export default function AdminPage() {
       setEditingClass(null);
       toast({ title: "Class updated successfully" });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Failed to update class",
         variant: "destructive",
@@ -191,14 +189,12 @@ export default function AdminPage() {
 
   const deleteClassMutation = useMutation({
     mutationFn: async (id: number) => {
-      console.log('Attempting to delete class:', id);
       const response = await fetch(`/api/classes/${id}`, {
         method: "DELETE",
       });
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to delete class' }));
-        console.error('Delete class error:', error);
-        throw new Error(error.message || "Failed to delete class");
+      if (!response.ok && response.status !== 204) {
+        const error = await response.json();
+        throw new Error(error.error?.message || "Failed to delete class");
       }
     },
     onSuccess: () => {
@@ -206,13 +202,14 @@ export default function AdminPage() {
       setDeletingItem(null);
       toast({ title: "Class deleted successfully" });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Delete class mutation error:', error);
       toast({
         title: "Failed to delete class",
         variant: "destructive",
         description: error.message,
       });
+      setDeletingItem(null);
     },
   });
 
@@ -232,7 +229,7 @@ export default function AdminPage() {
       setIsCreatingRoom(false);
       toast({ title: "Room created successfully" });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Failed to create room",
         variant: "destructive",
@@ -256,7 +253,7 @@ export default function AdminPage() {
       setEditingRoom(null);
       toast({ title: "Room updated successfully" });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Failed to update room",
         variant: "destructive",
@@ -277,16 +274,115 @@ export default function AdminPage() {
       setDeletingItem(null);
       toast({ title: "Room deleted successfully" });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Failed to delete room",
         variant: "destructive",
         description: error.message,
       });
+      setDeletingItem(null);
     },
   });
 
-  // Create dialog components
+  // Delete confirmation dialog
+  const DeleteConfirmationDialog = () => {
+    if (!deletingItem) return null;
+
+    const handleDelete = () => {
+      switch (deletingItem.type) {
+        case "professor":
+          deleteProfessorMutation.mutate(deletingItem.id);
+          break;
+        case "class":
+          deleteClassMutation.mutate(deletingItem.id);
+          break;
+        case "room":
+          deleteRoomMutation.mutate(deletingItem.id);
+          break;
+      }
+    };
+
+    return (
+      <AlertDialog open={!!deletingItem} onOpenChange={() => setDeletingItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this {deletingItem.type}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  };
+
+  const renderTable = (title: string, data: any[] | undefined, columns: string[]) => (
+    <Card className="mb-8">
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle>{title}</CardTitle>
+            <CardDescription>Manage {title.toLowerCase()}</CardDescription>
+          </div>
+          <Button onClick={() => {
+            if (title === "Professors") setIsCreatingProfessor(true);
+            if (title === "Classes") setIsCreatingClass(true);
+            if (title === "Rooms") setIsCreatingRoom(true);
+          }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add New
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {columns.map((col) => (
+                <TableHead key={col}>{col}</TableHead>
+              ))}
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data?.map((item) => (
+              <TableRow key={item.id}>
+                {columns.map((col) => (
+                  <TableCell key={col}>{item[col.toLowerCase()]}</TableCell>
+                ))}
+                <TableCell className="text-right space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (title === "Professors") setEditingProfessor(item);
+                      if (title === "Classes") setEditingClass(item);
+                      if (title === "Rooms") setEditingRoom(item);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => setDeletingItem({ type: title.toLowerCase().slice(0, -1), id: item.id })}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+
   const CreateProfessorDialog = () => {
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -310,7 +406,6 @@ export default function AdminPage() {
     );
   };
 
-  // Edit dialog components
   const EditProfessorDialog = () => {
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -503,106 +598,6 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
     );
-  };
-
-  // Delete confirmation dialog
-  const DeleteConfirmationDialog = () => {
-    if (!deletingItem) return null;
-
-    const handleDelete = () => {
-      switch (deletingItem.type) {
-        case "professor":
-          deleteProfessorMutation.mutate(deletingItem.id);
-          break;
-        case "class":
-          deleteClassMutation.mutate(deletingItem.id);
-          break;
-        case "room":
-          deleteRoomMutation.mutate(deletingItem.id);
-          break;
-      }
-    };
-
-    return (
-      <AlertDialog open={!!deletingItem} onOpenChange={() => setDeletingItem(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete this {deletingItem.type}.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    );
-  };
-
-  const renderTable = (title: string, data: any[] | undefined, columns: string[]) => (
-    <Card className="mb-8">
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle>{title}</CardTitle>
-            <CardDescription>Manage {title.toLowerCase()}</CardDescription>
-          </div>
-          <Button onClick={() => {
-            if (title === "Professors") setIsCreatingProfessor(true);
-            if (title === "Classes") setIsCreatingClass(true);
-            if (title === "Rooms") setIsCreatingRoom(true);
-          }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add New
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {columns.map((col) => (
-                <TableHead key={col}>{col}</TableHead>
-              ))}
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data?.map((item) => (
-              <TableRow key={item.id}>
-                {columns.map((col) => (
-                  <TableCell key={col}>{item[col.toLowerCase()]}</TableCell>
-                ))}
-                <TableCell className="text-right space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (title === "Professors") setEditingProfessor(item);
-                      if (title === "Classes") setEditingClass(item);
-                      if (title === "Rooms") setEditingRoom(item);
-                    }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive"
-                    onClick={() => setDeletingItem({ type: title.toLowerCase().slice(0, -1), id: item.id })}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  );
   };
 
   return (
