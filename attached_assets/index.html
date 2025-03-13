@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Multi-Day Calendar with Mirrored Repeated Events</title>
+  <!-- Link to the CSS file -->
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+  <h2>Multi-Day Calendar with Full-Width Layout, Restrictions, Linked Repetition & Event Table</h2>
+  <div id="calendarHeader">
+    <div id="headerTime">Time of Day</div>
+    <div id="headerDays"></div>
+  </div>
+  <div id="calendarContainer">
+    <div id="timeGutter"></div>
+    <div id="dayColumns"></div>
+  </div>
+  <table id="eventTable">
+    <thead>
+      <tr><th>Day</th><th>Start Time</th><th>End Time</th><th>Duration (min)</th><th>Professor</th><th>Class</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div id="modalProfessor" class="modal">
+    <div class="modal-content">
+      <h3>Assign Professor</h3>
+      <input type="text" id="professorSearch" placeholder="Search professor...">
+      <select id="professorSelect" size="5"></select>
+      <div style="text-align: right;">
+        <button id="cancelProfessorBtn">Cancel</button>
+        <button id="confirmProfessorBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+  <div id="modalClass" class="modal">
+    <div class="modal-content">
+      <h3>Assign Class</h3>
+      <input type="text" id="classSearch" placeholder="Search class...">
+      <select id="classSelect" size="5"></select>
+      <div style="text-align: right;">
+        <button id="cancelClassBtn">Cancel</button>
+        <button id="confirmClassBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+  <!-- Template for event elements -->
+  <template id="event-template">
+    <div class="event" style="position: relative;">
+      <div class="event-header" style="position: relative;">
+        <div class="assign-professor-icon" style="position: absolute; top: 0; left: 0;">
+          <i class="fas fa-chalkboard-teacher" title="Assign Professor"></i>
+        </div>
+        <div class="assign-class-icon" style="position: absolute; top: 0; right: 0;">
+          <i class="fas fa-book" title="Assign Class"></i>
+        </div>
+      </div>
+      <div class="event-body">
+        <!-- Event content goes here -->
+      </div>
+      <div class="event-footer" style="position: relative;">
+        <div class="delete-icon" style="position: absolute; bottom: 0; left: 0;">
+          <i class="fas fa-trash-alt" title="Delete Event"></i>
+        </div>
+      </div>
+    </div>
+  </template>
+  <!-- Link to the JavaScript file -->
+  <script src="script.js"></script>
+</body>
+</html>
