@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import Calendar from "@/pages/calendar";
 import AuthPage from "@/pages/auth";
 import DashboardPage from "@/pages/dashboard";
+import AdminPage from "@/pages/admin";
 
 function Router() {
   return (
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/" component={DashboardPage} />
       <ProtectedRoute path="/calendar" component={Calendar} />
+      <ProtectedRoute path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -7,10 +7,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Calendar, Home, LogOut, User } from "lucide-react";
+import { Calendar, Home, LogOut, User, Settings } from "lucide-react";
 
 export function Navbar() {
   const { user, logoutMutation } = useAuth();
+  const isSuperAdmin = user?.role === "super-admin";
 
   return (
     <nav className="border-b">
@@ -29,6 +30,14 @@ export function Navbar() {
               Calendar
             </Button>
           </Link>
+          {isSuperAdmin && (
+            <Link href="/admin">
+              <Button variant="link">
+                <Settings className="w-5 h-5 mr-2" />
+                Admin
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Right side - User menu */}

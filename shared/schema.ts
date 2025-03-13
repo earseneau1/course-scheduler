@@ -7,7 +7,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull(),
   password: text("password").notNull(),
-  role: text("role", { enum: ["admin", "faculty", "staff"] }).notNull().default("faculty"),
+  role: text("role", { enum: ["super-admin", "admin", "faculty", "staff"] }).notNull().default("faculty"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
